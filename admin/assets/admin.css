@@ -82,5 +82,20 @@ button.button-small { width:auto; margin:0; font-size:12px; padding:7px 10px; }
 .form-actions .button-secondary { min-width:100px; }
 .hotel-form-panel,.vacancy-form-panel { margin-bottom:24px; }
 .hotels-list-section,.vacancies-list-section { margin-top:0; }
+.inline-create-form { display:flex; gap:10px; align-items:center; }
+.inline-create-form input { flex:1; min-width:0; }
+.inline-create-form button { width:auto; margin:0; white-space:nowrap; }
+.category-list { display:grid; gap:14px; }
+.category-card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:18px; }
+.category-header { display:flex; justify-content:space-between; align-items:center; gap:14px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+.category-header > div { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.category-header strong { font-size:16px; }
+.role-section { padding-top:15px; }
+.role-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.role-list { display:grid; gap:7px; margin-bottom:14px; }
+.role-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; }
+.role-row > div { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.role-row .button-small { flex:0 0 auto; }
+.role-create-form { padding-top:4px; }
 @media (max-width:900px) { .sidebar{width:210px;} .content{margin-left:210px;width:calc(100% - 210px);} .cards{grid-template-columns:repeat(2,1fr);} .form-grid{grid-template-columns:1fr;} .field.full{grid-column:auto;} .filter-form{flex-wrap:wrap;} }
-@media (max-width:650px) { .sidebar{position:static;width:100%;min-height:auto;} .app-shell{display:block;} .content{margin-left:0;width:100%;padding:20px;} .sidebar-bottom{margin-top:20px;} .cards{grid-template-columns:1fr;} .topbar,.panel-header{align-items:flex-start;flex-direction:column;} .filter-form,.filter-form input,.filter-form select,.filter-form button{width:100%;} .form-actions{flex-direction:column;} .form-actions button,.form-actions .button-secondary{width:100%;} }
+@media (max-width:650px) { .sidebar{position:static;width:100%;min-height:auto;} .app-shell{display:block;} .content{margin-left:0;width:100%;padding:20px;} .sidebar-bottom{margin-top:20px;} .cards{grid-template-columns:1fr;} .topbar,.panel-header{align-items:flex-start;flex-direction:column;} .filter-form,.filter-form input,.filter-form select,.filter-form button{width:100%;} .form-actions{flex-direction:column;} .form-actions button,.form-actions .button-secondary{width:100%;} .inline-create-form{flex-direction:column;align-items:stretch;} .inline-create-form button{width:100%;} .category-header{align-items:flex-start;flex-direction:column;} .role-row{align-items:flex-start;flex-direction:column;} }
