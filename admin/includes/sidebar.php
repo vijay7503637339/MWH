@@ -13,6 +13,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <nav>
         <a class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php">Dashboard</a>
         <a class="<?= $currentPage === 'hotels.php' ? 'active' : '' ?>" href="hotels.php">Hotels</a>
+        <a class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>" href="categories.php">Categories & Job Roles</a>
         <a class="<?= $currentPage === 'vacancies.php' ? 'active' : '' ?>" href="vacancies.php">Vacancies</a>
         <a class="<?= $currentPage === 'candidates.php' ? 'active' : '' ?>" href="candidates.php">Candidates</a>
         <a class="<?= $currentPage === 'applications.php' ? 'active' : '' ?>" href="applications.php">Applications</a>
