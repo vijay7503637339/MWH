@@ -18,6 +18,7 @@ $pageTitle = $pageTitle ?? 'MWH Admin';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="assets/admin.css">
     <link rel="stylesheet" href="assets/metis-theme.css">
+    <link rel="stylesheet" href="assets/layout-fix.css">
 </head>
 <body class="admin-page">
 <div class="app-shell">
