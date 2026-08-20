@@ -1,3 +1,6 @@
+<?php
+$currentPage = basename($_SERVER['PHP_SELF']);
+?>
 <aside class="sidebar">
     <div class="sidebar-brand">
         <div class="brand-mark small">MWH</div>
@@ -8,13 +11,13 @@
     </div>
 
     <nav>
-        <a class="active" href="dashboard.php">Dashboard</a>
-        <a href="hotels.php">Hotels</a>
-        <a href="vacancies.php">Vacancies</a>
-        <a href="candidates.php">Candidates</a>
-        <a href="applications.php">Applications</a>
-        <a href="attendance.php">Attendance</a>
-        <a href="payments.php">Payments</a>
+        <a class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php">Dashboard</a>
+        <a class="<?= $currentPage === 'hotels.php' ? 'active' : '' ?>" href="hotels.php">Hotels</a>
+        <a class="<?= $currentPage === 'vacancies.php' ? 'active' : '' ?>" href="vacancies.php">Vacancies</a>
+        <a class="<?= $currentPage === 'candidates.php' ? 'active' : '' ?>" href="candidates.php">Candidates</a>
+        <a class="<?= $currentPage === 'applications.php' ? 'active' : '' ?>" href="applications.php">Applications</a>
+        <a class="<?= $currentPage === 'attendance.php' ? 'active' : '' ?>" href="attendance.php">Attendance</a>
+        <a class="<?= $currentPage === 'payments.php' ? 'active' : '' ?>" href="payments.php">Payments</a>
     </nav>
 
     <div class="sidebar-bottom">
