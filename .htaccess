@@ -1,0 +1,8 @@
+RewriteEngine On
+
+Options -Indexes
+
+# Keep sensitive project files inaccessible from the browser.
+<FilesMatch "\.(env|ini|log|sql|bak|config)$">
+    Require all denied
+</FilesMatch>
