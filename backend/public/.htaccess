@@ -1,0 +1,14 @@
+RewriteEngine On
+
+# Prevent directory listing.
+Options -Indexes
+
+# Route API requests to the PHP front controller.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
+
+# Block direct access to sensitive project files if this directory is moved.
+<FilesMatch "\.(env|ini|log|sql|bak|config)$">
+    Require all denied
+</FilesMatch>
