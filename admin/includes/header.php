@@ -19,6 +19,7 @@ $pageTitle = $pageTitle ?? 'MWH Admin';
     <link rel="stylesheet" href="assets/admin.css">
     <link rel="stylesheet" href="assets/metis-theme.css">
     <link rel="stylesheet" href="assets/layout-fix.css">
+    <link rel="stylesheet" href="assets/module-theme.css">
 </head>
 <body class="admin-page">
 <div class="app-shell">
