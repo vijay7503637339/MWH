@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * MWH database connection template.
+ *
+ * Copy to a server-only configuration location and provide credentials via
+ * environment variables. Never commit production credentials to GitHub.
+ */
+
+$dbHost = getenv('MWH_DB_HOST') ?: 'localhost';
+$dbName = getenv('MWH_DB_NAME') ?: 'sywwzxsv_mwh';
+$dbUser = getenv('MWH_DB_USER') ?: '';
+$dbPass = getenv('MWH_DB_PASS') ?: '';
+$dbPort = getenv('MWH_DB_PORT') ?: '3306';
+
+$dsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
+
+$options = [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES => false,
+];
+
+try {
+    $pdo = new PDO($dsn, $dbUser, $dbPass, $options);
+} catch (PDOException $e) {
+    error_log('MWH database connection failed: ' . $e->getMessage());
+    http_response_code(500);
+    exit('Database connection failed.');
+}
