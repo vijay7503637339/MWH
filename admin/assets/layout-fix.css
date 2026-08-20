@@ -1,0 +1,16 @@
+/* Global admin layout fix
+   Keeps every page content clear of the fixed sidebar.
+   Do not add page-specific margin-left rules to individual modules. */
+
+.app-shell > main.content {
+    margin-left: 256px !important;
+    width: calc(100% - 256px) !important;
+    min-width: 0;
+}
+
+@media (max-width: 900px) {
+    .app-shell > main.content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+}
