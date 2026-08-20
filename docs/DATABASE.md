@@ -1,113 +1,149 @@
-# Database Design Baseline — MWH
+# Database Design — MWH
 
-This is a design baseline, not the final SQL schema. The final schema must be reviewed before migrations are created.
+The database baseline has now been converted into the initial MySQL 8 migration:
 
-## Candidate Domain
+`database/migrations/001_initial_schema.sql`
 
-### users
-Core candidate/admin identity and account state.
+## Architecture
 
-Potential concepts:
-- id
-- role/type
-- mobile
-- status
-- verified_at
-- blocked_at
-- created_at
-- updated_at
+### Administration
+- `admin_roles`
+- `admin_permissions`
+- `admin_role_permissions`
+- `admin_users`
+- `audit_logs`
 
-### candidate_profiles
-Personal information associated with a candidate.
+### Candidate / authentication
+- `users`
+- `otp_codes`
+- `candidate_profiles`
+- `professional_details`
+- `job_preferences`
 
-### professional_details
-Professional/experience information.
+### Documents / payment profile
+- `candidate_documents`
+- `candidate_payment_profiles`
 
-### job_preferences
-Candidate category/role/travel/work-hour preferences.
+### Master data
+- `categories`
+- `job_roles`
 
-### candidate_documents
-Document metadata, secure storage reference, document type, review status and admin review metadata.
+### Hospitality
+- `hotels`
+- `hotel_images`
+- `vacancies`
 
-### candidate_payment_profiles
-Bank/UPI payment details with restricted access.
+### Recruitment
+- `applications`
+- `jobs`
 
-## Master Data
+### Attendance
+- `attendance_records`
 
-### categories
-Admin-managed candidate/vacancy categories.
+### Finance
+- `payments`
 
-### job_roles
-Admin-managed roles/services linked to categories where required.
+### Supporting services
+- `notifications`
+- `support_settings`
 
-## Hospitality Domain
+## Key relationships
 
-### hotels
-Registered hotels managed by MWH.
+```text
+users
+ ├── candidate_profiles
+ ├── professional_details
+ ├── job_preferences ──> categories / job_roles
+ ├── candidate_documents
+ ├── candidate_payment_profiles
+ ├── applications ──> vacancies ──> hotels
+ ├── jobs ──> hotels / vacancies
+ ├── attendance_records
+ ├── payments
+ └── notifications
 
-### vacancies
-Hotel job openings, role, openings count, payout, working hours, status and description.
+categories
+ └── job_roles
 
-## Recruitment Domain
+hotels
+ ├── hotel_images
+ └── vacancies
 
-### applications
-Candidate-to-vacancy application records and status history/current status.
+vacancies
+ └── applications
+      └── jobs
+           └── attendance_records
 
-### jobs
-Approved candidate assignment/job records created from the recruitment workflow.
+admin_roles
+ └── admin_role_permissions ──> admin_permissions
+      └── admin_users
+```
 
-## Attendance Domain
+## Important design decisions
 
-### attendance/check_ins
-Check-in/check-out records, timestamps, evidence reference and approved location metadata if location tracking is finalized.
+1. Candidate login is mobile + OTP. No candidate password is stored.
+2. OTP values are stored only as hashes with expiry and attempt limits.
+3. Candidate verification/blocking is represented on `users` and audited.
+4. Categories and job roles are dynamic admin-managed master data.
+5. A candidate can apply only once to the same vacancy (`unique vacancy_id + user_id`).
+6. A job is created from an approved application and keeps a snapshot of the agreed payout.
+7. Attendance supports check-in and check-out records and camera-evidence metadata.
+8. GPS fields are nullable because mandatory geolocation has not yet been finalized as a business requirement.
+9. Payments are manually entered by authorized admins and linked to a candidate and optionally a job.
+10. Bank account numbers are intended to be application-layer encrypted before storage.
+11. Candidate documents store a protected storage reference rather than public file URLs.
+12. Admin access uses role-based permissions.
+13. Important administrative actions are recorded in `audit_logs`.
+14. Historical business records should be deactivated/soft-deleted where appropriate rather than physically deleted.
 
-## Finance Domain
+## Status values used by the application
 
-### payments
-Admin-entered candidate payments, amount, date, reference/method and audit metadata.
+The database intentionally uses VARCHAR status fields so business workflows can evolve without destructive schema changes. The backend must centralize allowed values.
 
-## Administration
+### Candidate account
+- `pending_verification`
+- `verified`
+- `rejected`
+- `blocked`
 
-### admin_users
-Admin identities and status.
+### Document review
+- `pending`
+- `approved`
+- `rejected`
 
-### admin_roles / permissions
-Role-based access control if multiple admin roles are required.
+### Hotel
+- `active`
+- `inactive`
 
-### audit_logs
-Important admin/system actions with actor, action, entity and timestamp.
+### Vacancy
+- `draft`
+- `published`
+- `paused`
+- `closed`
 
-## Supporting Domain
+### Application
+- `applied`
+- `under_review`
+- `shortlisted`
+- `approved`
+- `rejected`
+- `withdrawn`
 
-### notifications
-Candidate/admin notifications if persisted notification history is required.
+### Job
+- `assigned`
+- `active`
+- `completed`
+- `cancelled`
 
-### support_settings
-Current support phone/contact configuration.
+## Security
 
-## Design Rules
+- Never commit credentials or secrets.
+- Never log OTPs, Aadhaar/PAN numbers, bank account numbers, or document contents.
+- Store candidate documents outside the public web root or behind authenticated access.
+- Use `password_hash()` / `password_verify()` for admin passwords.
+- Use API authorization middleware for every protected endpoint.
+- Audit sensitive admin operations.
 
-1. Use InnoDB and appropriate UTF-8 encoding.
-2. Use primary keys and foreign keys for relationships.
-3. Add indexes based on actual query patterns.
-4. Avoid storing duplicate derived values unless justified.
-5. Use timestamps consistently.
-6. Use status enums or controlled lookup values consistently; final choice should follow the API/backend implementation strategy.
-7. Sensitive document/payment data requires restricted access.
-8. Historical business records should generally be deactivated/soft-deleted instead of physically deleted.
-9. All schema changes must be migration-based.
+## Next stage
 
-## Pending Design Decisions
-
-Before writing migrations, finalize:
-- Exact table/column names
-- UUID vs numeric IDs
-- Status values
-- Application status lifecycle
-- Job status lifecycle
-- Payment fields/reference rules
-- Document storage provider/path strategy
-- OTP provider and OTP persistence strategy
-- Whether GPS is mandatory for check-in
-- Hotel location/geospatial requirements
-- Notification persistence requirements
+The database is ready as the foundation for the **Admin Panel Phase 1: Admin Authentication + RBAC + Admin Layout + Dashboard shell**. The PHP backend should use migrations rather than manually changing production tables.
