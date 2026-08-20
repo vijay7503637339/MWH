@@ -1,0 +1,4 @@
+deployment:
+  tasks:
+    - export DEPLOYPATH=$HOME/public_html/MWH/
+    - /bin/rsync -a --exclude='.git/' --exclude='api/uploads/' ./ "$DEPLOYPATH"
