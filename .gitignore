@@ -38,3 +38,8 @@ coverage/
 *.sqlite
 *.sqlite3
 config/local.*
+
+# Keep version-controlled database migrations
+!database/
+!database/migrations/
+!database/migrations/*.sql
