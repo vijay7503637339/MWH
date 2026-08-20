@@ -15,6 +15,17 @@ if (logoutLink) {
     });
 }
 
+const mobileMenuButton = document.getElementById('mobileMenuButton');
+if (mobileMenuButton) {
+    mobileMenuButton.addEventListener('click', () => document.body.classList.toggle('nav-open'));
+}
+
+document.addEventListener('click', (event) => {
+    if (window.innerWidth > 900 || !document.body.classList.contains('nav-open')) return;
+    if (event.target.closest('.sidebar') || event.target.closest('#mobileMenuButton')) return;
+    document.body.classList.remove('nav-open');
+});
+
 const categorySelect = document.getElementById('categorySelect');
 const jobRoleSelect = document.getElementById('jobRoleSelect');
 
