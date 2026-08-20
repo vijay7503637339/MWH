@@ -1,0 +1,73 @@
+/* MWH shared module UI - keep all admin modules visually consistent with Applications */
+:root{--module-blue:#3f6ff0;--module-blue2:#5d80ed;--module-bg:#f5f7fb;--module-border:#e6eaf1;--module-text:#24334d;--module-muted:#7b869a;--module-radius:14px}
+
+/* Page header */
+main.content>.topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:22px}
+main.content>.topbar h1{font-size:30px!important;font-weight:800!important;letter-spacing:-.045em!important;color:#1b2941!important;margin:0 0 5px!important}
+main.content>.topbar p.muted{font-size:11px!important;color:var(--module-muted)!important;margin:0!important}
+main.content>.topbar:before{content:'MWH  /  Admin';display:none}
+
+/* Consistent panels */
+main.content .panel{background:#fff;border:1px solid var(--module-border);border-radius:var(--module-radius);box-shadow:0 4px 18px rgba(25,42,70,.045);overflow:hidden}
+main.content .panel-header{padding:20px 22px 15px;margin:0;display:flex;align-items:center;justify-content:space-between;gap:15px}
+main.content .panel-header h2{font-size:16px!important;font-weight:800!important;color:var(--module-text)!important;margin:0!important}
+main.content .panel-header .muted{font-size:11px!important;color:var(--module-muted)!important;margin:4px 0 0!important}
+
+/* Modern add / primary actions */
+main.content .button-link,main.content .form-actions button,main.content button[type=submit]{background:linear-gradient(135deg,var(--module-blue),var(--module-blue2));border:0;color:#fff;border-radius:9px;font-size:11px;font-weight:800;padding:11px 16px;text-decoration:none;box-shadow:0 6px 15px rgba(63,111,240,.15);transition:.18s ease}
+main.content .button-link:hover,main.content .form-actions button:hover,main.content button[type=submit]:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(63,111,240,.22)}
+main.content .button-secondary{display:inline-flex;align-items:center;justify-content:center;border:1px solid #dfe4ed;background:#fff;color:#61708a;border-radius:9px;font-size:11px;font-weight:750;padding:10px 14px;text-decoration:none}
+
+/* Filters */
+main.content .filter-form{display:flex;align-items:center;gap:9px;background:#f8faff;border:1px solid var(--module-border);padding:12px 14px;border-radius:12px}
+main.content .filter-form input,main.content .filter-form select{height:40px;min-height:40px;margin:0;border:1px solid #dfe4ed;border-radius:9px;background:#fff;font-size:11px;padding:0 11px}
+main.content .filter-form input{min-width:250px}
+
+/* Forms */
+main.content .form-grid{padding:4px 22px 22px}
+main.content .field label{display:block;font-size:11px;font-weight:750;color:#526078;margin:14px 0 6px}
+main.content .field input,main.content .field select,main.content .field textarea{border:1px solid #dfe4ed;border-radius:9px;background:#fbfcfe;font-size:12px;min-height:42px;padding:10px 11px;box-sizing:border-box}
+main.content .field input:focus,main.content .field select:focus,main.content .field textarea:focus{border-color:#7191ef;box-shadow:0 0 0 4px rgba(63,111,240,.1);outline:0}
+main.content .form-actions{display:flex;gap:9px;align-items:center;margin-top:4px}
+
+/* Tables */
+main.content .table-wrap{background:#fff;border:1px solid var(--module-border);border-radius:var(--module-radius);box-shadow:0 4px 18px rgba(25,42,70,.04);overflow:hidden}
+main.content .table-wrap table{width:100%;border-collapse:separate;border-spacing:0}
+main.content .table-wrap th{background:#fff;color:#8994a7;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;padding:13px 16px;border-bottom:1px solid #e8ecf2;white-space:nowrap}
+main.content .table-wrap td{padding:14px 16px;color:#34435d;font-size:11px;border-bottom:1px solid #edf0f5;vertical-align:middle}
+main.content .table-wrap tbody tr{transition:background .18s ease}
+main.content .table-wrap tbody tr:hover{background:#fbfcff}
+main.content .table-wrap tbody tr:last-child td{border-bottom:0}
+
+/* Status / badges */
+main.content .status,main.content .badge,main.content .pill{border-radius:999px;font-size:10px;font-weight:800;padding:6px 10px}
+main.content .status.active,main.content .badge.active{background:#ebfbf4;color:#087b50}
+main.content .status.inactive,main.content .badge.inactive{background:#fff0f1;color:#c9363d}
+
+/* Summary cards used by modules */
+main.content .module-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+main.content .module-stat{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--module-border);border-radius:14px;padding:15px 16px;box-shadow:0 4px 14px rgba(20,35,60,.04)}
+main.content .module-stat-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#eef3ff;color:var(--module-blue);flex:0 0 40px}
+main.content .module-stat strong{display:block;font-size:20px;line-height:1.1;color:#172033}
+main.content .module-stat span{display:block;margin-top:4px;color:var(--module-muted);font-size:10px;font-weight:650}
+
+/* Dashboard */
+.dashboard-modern .dashboard-welcome{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.dashboard-modern .dashboard-welcome h1{font-size:30px;font-weight:800;letter-spacing:-.045em;margin:0 0 5px;color:#1b2941}
+.dashboard-modern .dashboard-welcome p{margin:0;color:var(--module-muted);font-size:11px}
+.dashboard-modern .dashboard-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.dashboard-modern .dashboard-card{background:#fff;border:1px solid var(--module-border);border-radius:14px;padding:18px;box-shadow:0 4px 18px rgba(25,42,70,.045);transition:.2s ease}
+.dashboard-modern .dashboard-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(25,42,70,.09)}
+.dashboard-modern .dashboard-card .icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#eef3ff;color:var(--module-blue);margin-bottom:13px}
+.dashboard-modern .dashboard-card .label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#7e899c;font-weight:800}
+.dashboard-modern .dashboard-card .value{font-size:28px;font-weight:800;color:#1d3155;margin-top:4px}
+.dashboard-modern .dashboard-card .link{font-size:10px;color:var(--module-blue);font-weight:750;text-decoration:none;display:inline-block;margin-top:8px}
+
+/* Animation shared by all modules */
+main.content>.topbar,main.content>.panel,main.content>.section,main.content>.module-summary,main.content>.dashboard-cards{animation:moduleFadeUp .38s ease both}
+main.content>.panel{animation-delay:.04s}
+@keyframes moduleFadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:1100px){main.content .module-summary,.dashboard-modern .dashboard-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){main.content>.topbar{align-items:flex-start}.dashboard-modern .dashboard-cards{grid-template-columns:repeat(2,minmax(0,1fr))}main.content .filter-form{flex-wrap:wrap}main.content .filter-form input{min-width:200px}}
+@media(max-width:600px){main.content>.topbar{flex-direction:column;align-items:flex-start}.dashboard-modern .dashboard-cards,main.content .module-summary{grid-template-columns:1fr}.main.content .filter-form{display:grid;grid-template-columns:1fr}main.content .filter-form input{min-width:0;width:100%}main.content .panel-header{padding:17px 16px 14px}main.content .form-grid{padding:4px 16px 18px}.dashboard-modern .dashboard-welcome{display:block}}
