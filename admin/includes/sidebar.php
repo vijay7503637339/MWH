@@ -10,20 +10,43 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         </div>
     </div>
 
-    <nav>
-        <a class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php">Dashboard</a>
-        <a class="<?= $currentPage === 'hotels.php' ? 'active' : '' ?>" href="hotels.php">Hotels</a>
-        <a class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>" href="categories.php">Categories & Job Roles</a>
-        <a class="<?= $currentPage === 'vacancies.php' ? 'active' : '' ?>" href="vacancies.php">Vacancies</a>
-        <a class="<?= $currentPage === 'candidates.php' ? 'active' : '' ?>" href="candidates.php">Candidates</a>
-        <a class="<?= $currentPage === 'applications.php' ? 'active' : '' ?>" href="applications.php">Applications</a>
-        <a class="<?= $currentPage === 'attendance.php' ? 'active' : '' ?>" href="attendance.php">Attendance</a>
-        <a class="<?= $currentPage === 'payments.php' ? 'active' : '' ?>" href="payments.php">Payments</a>
+    <nav class="admin-nav" aria-label="Admin navigation">
+        <a class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php">
+            <span class="nav-icon" aria-hidden="true">⌂</span><span>Dashboard</span>
+        </a>
+        <a class="<?= $currentPage === 'hotels.php' ? 'active' : '' ?>" href="hotels.php">
+            <span class="nav-icon" aria-hidden="true">▦</span><span>Hotels</span>
+        </a>
+        <a class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>" href="categories.php">
+            <span class="nav-icon" aria-hidden="true">◇</span><span>Categories & Job Roles</span>
+        </a>
+        <a class="<?= $currentPage === 'vacancies.php' ? 'active' : '' ?>" href="vacancies.php">
+            <span class="nav-icon" aria-hidden="true">◫</span><span>Vacancies</span>
+        </a>
+        <a class="<?= $currentPage === 'candidates.php' ? 'active' : '' ?>" href="candidates.php">
+            <span class="nav-icon" aria-hidden="true">◎</span><span>Candidates</span>
+        </a>
+        <a class="<?= $currentPage === 'applications.php' ? 'active' : '' ?>" href="applications.php">
+            <span class="nav-icon" aria-hidden="true">✓</span><span>Applications</span>
+        </a>
+        <a class="<?= $currentPage === 'attendance.php' ? 'active' : '' ?>" href="attendance.php">
+            <span class="nav-icon" aria-hidden="true">◷</span><span>Attendance</span>
+        </a>
+        <a class="<?= $currentPage === 'payments.php' ? 'active' : '' ?>" href="payments.php">
+            <span class="nav-icon" aria-hidden="true">₹</span><span>Payments</span>
+        </a>
     </nav>
 
     <div class="sidebar-bottom">
-        <div class="admin-name"><?= htmlspecialchars($admin['name']) ?></div>
-        <div class="admin-role"><?= htmlspecialchars($admin['role']) ?></div>
-        <a href="../api/auth/logout.php" class="logout-link" id="logoutLink">Logout</a>
+        <div class="admin-profile">
+            <div class="admin-avatar"><?= htmlspecialchars(strtoupper(substr($admin['name'], 0, 1))) ?></div>
+            <div class="admin-profile-copy">
+                <div class="admin-name"><?= htmlspecialchars($admin['name']) ?></div>
+                <div class="admin-role"><?= htmlspecialchars($admin['role']) ?></div>
+            </div>
+        </div>
+        <a href="../api/auth/logout.php" class="logout-link" id="logoutLink">
+            <span class="nav-icon" aria-hidden="true">↪</span><span>Logout</span>
+        </a>
     </div>
 </aside>
