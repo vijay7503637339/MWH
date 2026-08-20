@@ -33,12 +33,72 @@ if($search!==''){$sql.=' AND (cp.first_name LIKE ? OR cp.last_name LIKE ? OR u.m
 $sql.=' ORDER BY a.applied_at DESC';$stmt=$pdo->prepare($sql);$stmt->execute($params);$applications=$stmt->fetchAll(PDO::FETCH_ASSOC);
 require __DIR__.'/includes/header.php'; require __DIR__.'/includes/sidebar.php';
 ?>
-<main class="content">
-<div class="topbar"><div><h1>Applications</h1><p class="muted">Review and manage candidate applications for hotel vacancies.</p></div></div>
-<?php if($success):?><div class="alert success"><?=e($success)?></div><?php endif;?>
-<?php foreach($errors as $error):?><div class="alert error"><?=e($error)?></div><?php endforeach;?>
-<section class="panel"><form class="filters" method="get"><input type="search" name="search" value="<?=e($search)?>" placeholder="Search candidate, mobile, vacancy or hotel"><select name="status"><option value="all">All Status</option><?php foreach(['applied'=>'Applied','contacted'=>'Contacted','selected'=>'Selected','rejected'=>'Rejected'] as $key=>$label):?><option value="<?=e($key)?>" <?=$status===$key?'selected':''?>><?=e($label)?></option><?php endforeach;?></select><button class="button-secondary" type="submit">Search</button><?php if($search!==''||$status!=='all'):?><a class="button-secondary" href="applications.php">Clear</a><?php endif;?></form>
-<div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Vacancy</th><th>Hotel</th><th>Applied</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-<?php if(!$applications):?><tr><td colspan="6" class="empty-box">No applications found.</td></tr><?php endif;?>
-<?php foreach($applications as $row):?><tr><td><strong><?=e(trim(($row['first_name']??'').' '.($row['last_name']??'')))?></strong><br><span class="muted small"><?=e($row['mobile'])?><?=!empty($row['city'])?' · '.e($row['city']):''?></span></td><td><?=e($row['vacancy_title'])?><br><span class="muted small"><?=e($row['category_name']??'')?><?=!empty($row['job_role_name'])?' · '.e($row['job_role_name']):''?></span></td><td><?=e($row['hotel_name'])?><br><span class="muted small"><?=e($row['hotel_city']??'')?></span></td><td><?=e(date('d M Y, h:i A',strtotime($row['applied_at'])))?></td><td><span class="status-badge <?=e($row['status'])?>"><?=e(ucfirst($row['status']))?></span></td><td><div class="action-buttons"><a class="button-secondary small-button" href="candidates.php?view=<?=e((string)$row['user_id'])?>">Candidate</a><?php if($row['status']==='applied'):?><form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="contact"><button class="button-secondary small-button" type="submit">Contacted</button></form><form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="select"><button class="button-primary small-button" type="submit">Select</button></form><form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="reject"><button class="button-danger small-button" type="submit">Reject</button></form><?php elseif($row['status']==='contacted'):?><form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="select"><button class="button-primary small-button" type="submit">Select</button></form><?php endif;?></div></td></tr><?php endforeach;?></tbody></table></div></section>
-</main><?php require __DIR__.'/includes/footer.php'; ?>
+<main class="content applications-page">
+    <div class="topbar applications-heading">
+        <div>
+            <div class="page-kicker"><i class="bi bi-briefcase"></i> Workforce Management</div>
+            <h1>Applications</h1>
+            <p class="muted">Review, shortlist and manage candidate applications for hotel vacancies.</p>
+        </div>
+        <div class="applications-count"><strong><?=count($applications)?></strong><span>Applications</span></div>
+    </div>
+
+    <?php if($success):?><div class="alert success"><i class="bi bi-check-circle"></i><?=e($success)?></div><?php endif;?>
+    <?php foreach($errors as $error):?><div class="alert error"><i class="bi bi-exclamation-circle"></i><?=e($error)?></div><?php endforeach;?>
+
+    <section class="panel applications-panel">
+        <div class="panel-header applications-panel-header">
+            <div><h2>Application Pipeline</h2><p class="muted">Search applications and filter candidates by their current status.</p></div>
+        </div>
+        <form class="application-filters" method="get">
+            <div class="application-search">
+                <i class="bi bi-search"></i>
+                <input type="search" name="search" value="<?=e($search)?>" placeholder="Search candidate, mobile, vacancy or hotel">
+            </div>
+            <div class="application-status-filter">
+                <i class="bi bi-funnel"></i>
+                <select name="status">
+                    <option value="all">All Status</option>
+                    <?php foreach(['applied'=>'Applied','contacted'=>'Contacted','selected'=>'Selected','rejected'=>'Rejected'] as $key=>$label):?>
+                        <option value="<?=e($key)?>" <?=$status===$key?'selected':''?>><?=e($label)?></option>
+                    <?php endforeach;?>
+                </select>
+            </div>
+            <button class="application-search-button" type="submit"><i class="bi bi-search"></i> Search</button>
+            <?php if($search!==''||$status!=='all'):?><a class="application-clear" href="applications.php">Clear</a><?php endif;?>
+        </form>
+
+        <div class="application-table-wrap">
+            <table class="application-table">
+                <thead><tr><th>Candidate</th><th>Vacancy</th><th>Hotel</th><th>Applied</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                <?php if(!$applications):?><tr><td colspan="6" class="application-empty"><div><i class="bi bi-inbox"></i><strong>No applications found</strong><span>Try changing your search or status filter.</span></div></td></tr><?php endif;?>
+                <?php foreach($applications as $row):?>
+                    <tr>
+                        <td>
+                            <div class="candidate-cell"><div class="candidate-avatar"><?=e(strtoupper(substr(trim(($row['first_name']??'').' '.($row['last_name']??'')),0,1)))?></div><div><strong><?=e(trim(($row['first_name']??'').' '.($row['last_name']??'')))?></strong><span><?=e($row['mobile'])?><?=!empty($row['city'])?' · '.e($row['city']):''?></span></div></div>
+                        </td>
+                        <td><div class="primary-cell"><?=e($row['vacancy_title'])?></div><div class="secondary-cell"><?=e($row['category_name']??'')?><?=!empty($row['job_role_name'])?' · '.e($row['job_role_name']):''?></div></td>
+                        <td><div class="primary-cell"><?=e($row['hotel_name'])?></div><div class="secondary-cell"><?=e($row['hotel_city']??'')?></div></td>
+                        <td><div class="date-cell"><strong><?=e(date('d M Y',strtotime($row['applied_at'])))?></strong><span><?=e(date('h:i A',strtotime($row['applied_at'])))?></span></div></td>
+                        <td><span class="application-status status-<?=e($row['status'])?>"><span></span><?=e(ucfirst($row['status']))?></span></td>
+                        <td>
+                            <div class="application-actions">
+                                <a class="application-action view" href="candidates.php?view=<?=e((string)$row['user_id'])?>"><i class="bi bi-person"></i> Candidate</a>
+                                <?php if($row['status']==='applied'):?>
+                                    <form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="contact"><button class="application-action contact" type="submit">Contact</button></form>
+                                    <form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="select"><button class="application-action select" type="submit"><i class="bi bi-check2"></i> Select</button></form>
+                                    <form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="reject"><button class="application-action reject" type="submit">Reject</button></form>
+                                <?php elseif($row['status']==='contacted'):?>
+                                    <form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="select"><button class="application-action select" type="submit"><i class="bi bi-check2"></i> Select</button></form>
+                                <?php endif;?>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach;?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+<?php require __DIR__.'/includes/footer.php'; ?>
