@@ -1,0 +1,42 @@
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/pubspec.lock
+**/android/.gradle/
+**/android/local.properties
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+
+# PHP / Composer
+**/vendor/
+composer.lock
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Logs / temp
+*.log
+*.tmp
+coverage/
+
+# Local database dumps / credentials
+*.sql
+*.sqlite
+*.sqlite3
+config/local.*
