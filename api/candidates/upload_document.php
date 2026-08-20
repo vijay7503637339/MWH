@@ -88,7 +88,8 @@ try {
         throw new RuntimeException('Unable to save uploaded document');
     }
 
-    $storagePath = 'api/uploads/documents/' . $userId . '/' . $storedName;
+    // Store the path relative to /MWH so the admin panel can build /MWH/api/<path>.
+    $storagePath = 'uploads/documents/' . $userId . '/' . $storedName;
     $originalName = basename((string)$file['name']);
 
     $stmt = $pdo->prepare('INSERT INTO candidate_documents (user_id, document_type, storage_path, original_file_name, mime_type, file_size_bytes, review_status) VALUES (?,?,?,?,?,?,\'pending\')');
