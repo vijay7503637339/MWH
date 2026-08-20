@@ -33,7 +33,20 @@
     };
 
     if (file === 'dashboard.php') {
-        main.classList.add('mwh-standard-dashboard');
+        const welcome = main.querySelector('.dashboard-welcome');
+        if (welcome) {
+            main.classList.add('mwh-standard-dashboard');
+            const copy = welcome.querySelector(':scope > div:first-child');
+            const title = copy && copy.querySelector('h1');
+            if (copy && title && !copy.querySelector('.mwh-module-kicker')) {
+                const kicker = document.createElement('div');
+                kicker.className = 'mwh-module-kicker';
+                kicker.innerHTML = '<i class="bi bi-grid-1x2-fill"></i> WORKFORCE MANAGEMENT';
+                copy.insertBefore(kicker, title);
+            }
+            const count = welcome.querySelector('.applications-count');
+            if (count) count.classList.add('mwh-module-count');
+        }
         return;
     }
 
@@ -44,6 +57,7 @@
     const topbar = main.querySelector(':scope > .topbar');
     if (!topbar) return;
 
+    const topAction = topbar.querySelector(':scope > .button-link');
     const copy = topbar.querySelector(':scope > div:first-child');
     const title = copy && copy.querySelector('h1');
     const description = copy && copy.querySelector('p.muted');
@@ -72,6 +86,14 @@
         stats.appendChild(card);
     });
     topbar.insertAdjacentElement('afterend', stats);
+
+    if (topAction) {
+        const targetHeader = main.querySelector('.section .panel-header, .panel .panel-header');
+        if (targetHeader) {
+            topAction.classList.add('mwh-panel-action');
+            targetHeader.appendChild(topAction);
+        }
+    }
 
     requestAnimationFrame(function () { updateStats(cfg); });
 
