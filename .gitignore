@@ -10,7 +10,6 @@
 **/.flutter-plugins-dependencies
 **/.packages
 **/build/
-**/pubspec.lock
 **/android/.gradle/
 **/android/local.properties
 **/ios/Pods/
@@ -20,7 +19,6 @@
 
 # PHP / Composer
 **/vendor/
-composer.lock
 
 # Environment / secrets
 .env
