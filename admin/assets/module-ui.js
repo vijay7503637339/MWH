@@ -38,7 +38,7 @@
             main.classList.add('mwh-standard-dashboard');
             const copy = welcome.querySelector(':scope > div:first-child');
             const title = copy && copy.querySelector('h1');
-            if (copy && title && !copy.querySelector('.mwh-module-kicker')) {
+            if (copy && title && !copy.querySelector('.mwh-module-kicker') && !copy.querySelector('.page-kicker')) {
                 const kicker = document.createElement('div');
                 kicker.className = 'mwh-module-kicker';
                 kicker.innerHTML = '<i class="bi bi-grid-1x2-fill"></i> WORKFORCE MANAGEMENT';
@@ -66,10 +66,13 @@
     title.textContent = cfg.title;
     if (description) description.textContent = cfg.description;
 
-    const kicker = document.createElement('div');
-    kicker.className = 'mwh-module-kicker';
-    kicker.innerHTML = '<i class="bi ' + cfg.icon + '"></i> ' + cfg.kicker;
-    copy.insertBefore(kicker, title);
+    const existingKicker = copy.querySelector('.mwh-module-kicker, .page-kicker');
+    if (!existingKicker) {
+        const kicker = document.createElement('div');
+        kicker.className = 'mwh-module-kicker';
+        kicker.innerHTML = '<i class="bi ' + cfg.icon + '"></i> ' + cfg.kicker;
+        copy.insertBefore(kicker, title);
+    }
 
     const countCard = document.createElement('div');
     countCard.className = 'mwh-module-count';
