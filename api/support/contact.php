@@ -1,0 +1,2 @@
+<?php
+declare(strict_types=1);require_once __DIR__.'/../config/api.php';$u=requireUser($pdo);if($_SERVER['REQUEST_METHOD']!=='GET')respond(['success'=>false,'message'=>'Method not allowed'],405);$s=$pdo->query('SELECT support_phone,support_email,whatsapp_number,instructions FROM support_settings WHERE is_active=1 ORDER BY id DESC LIMIT 1');respond(['success'=>true,'data'=>$s->fetch(PDO::FETCH_ASSOC)?:['support_phone'=>null,'support_email'=>null,'whatsapp_number'=>null,'instructions'=>null]]);
