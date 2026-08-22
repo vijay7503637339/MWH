@@ -37,3 +37,22 @@ function issueToken(PDO $pdo, int $userId): string {
     $stmt=$pdo->prepare('INSERT INTO api_tokens(user_id,token_hash,expires_at) VALUES(?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 30 DAY))');
     $stmt->execute([$userId,$hash]); return $token;
 }
+
+function publicUploadUrl(string $storagePath): string {
+    $storagePath = ltrim($storagePath, '/');
+    return 'https://webstripetechnologies.com/MWH/api/' . $storagePath;
+}
+
+function mapHotelImages(array $images): array {
+    return array_map(static function (array $image): array {
+        $storagePath = ltrim((string)$image['storage_path'], '/');
+        return [
+            'id' => (int)$image['id'],
+            'storage_path' => $storagePath,
+            'url' => publicUploadUrl($storagePath),
+            'original_file_name' => $image['original_file_name'],
+            'is_primary' => (bool)$image['is_primary'],
+            'sort_order' => (int)$image['sort_order'],
+        ];
+    }, $images);
+}

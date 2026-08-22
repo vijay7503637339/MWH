@@ -94,7 +94,7 @@ respond([
         'pay' => [
             'amount' => (float)$row['payout_amount'],
             'period' => $row['payout_period'],
-            'currency' => 'USD',
+            'currency' => 'INR',
         ],
         'openings_count' => (int)$row['openings_count'],
         'working_hours' => $row['working_hours'] !== null ? (float)$row['working_hours'] : null,
@@ -121,15 +121,7 @@ respond([
             'longitude' => $row['hotel_longitude'] !== null ? (float)$row['hotel_longitude'] : null,
             'contact_name' => $row['hotel_contact_name'],
             'contact_phone' => $row['hotel_contact_phone'],
-            'images' => array_map(static function (array $image): array {
-                return [
-                    'id' => (int)$image['id'],
-                    'storage_path' => $image['storage_path'],
-                    'original_file_name' => $image['original_file_name'],
-                    'is_primary' => (bool)$image['is_primary'],
-                    'sort_order' => (int)$image['sort_order'],
-                ];
-            }, $images),
+            'images' => mapHotelImages($images),
         ],
     ],
 ]);
