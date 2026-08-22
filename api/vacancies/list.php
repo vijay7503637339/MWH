@@ -1,0 +1,7 @@
+<?php
+declare(strict_types=1); require_once __DIR__ . '/../config/api.php';
+if($_SERVER['REQUEST_METHOD']!=='GET') respond(['success'=>false,'message'=>'Method not allowed'],405);
+$page=max(1,(int)($_GET['page']??1));$perPage=min(50,max(1,(int)($_GET['per_page']??20)));$offset=($page-1)*$perPage;$category=(int)($_GET['category_id']??0);$role=(int)($_GET['job_role_id']??0);$city=trim((string)($_GET['city']??''));
+$where="v.status='published' AND v.deleted_at IS NULL";$params=[];if($category){$where.=' AND v.category_id=?';$params[]=$category;}if($role){$where.=' AND v.job_role_id=?';$params[]=$role;}if($city!==''){$where.=' AND h.city=?';$params[]=$city;}
+$c=$pdo->prepare("SELECT COUNT(*) FROM vacancies v INNER JOIN hotels h ON h.id=v.hotel_id WHERE $where");$c->execute($params);$total=(int)$c->fetchColumn();
+$s=$pdo->prepare("SELECT v.id,v.title,v.description,v.openings_count,v.payout_amount,v.payout_period,v.working_hours,v.requirements,v.published_at,v.closing_at,h.id hotel_id,h.name hotel_name,h.address_line,h.city,h.state,c.id category_id,c.name category_name,r.id job_role_id,r.name job_role_name FROM vacancies v INNER JOIN hotels h ON h.id=v.hotel_id INNER JOIN categories c ON c.id=v.category_id INNER JOIN job_roles r ON r.id=v.job_role_id WHERE $where ORDER BY v.published_at DESC LIMIT $perPage OFFSET $offset");$s->execute($params);respond(['success'=>true,'data'=>$s->fetchAll(PDO::FETCH_ASSOC),'pagination'=>['page'=>$page,'per_page'=>$perPage,'total'=>$total,'last_page'=>$total?ceil($total/$perPage):0]]);
