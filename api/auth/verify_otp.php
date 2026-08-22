@@ -29,7 +29,12 @@ if ($otp !== '111111') {
 }
 
 try {
-    $stmt = $pdo->prepare('SELECT id, name, email, mobile, status FROM users WHERE mobile = ? LIMIT 1');
+    $stmt = $pdo->prepare(
+        'SELECT id, email, mobile, account_status
+         FROM users
+         WHERE mobile = ? AND deleted_at IS NULL
+         LIMIT 1'
+    );
     $stmt->execute([$mobile]);
     $user = $stmt->fetch();
 
@@ -37,7 +42,10 @@ try {
         echo json_encode([
             'success' => true,
             'message' => 'OTP verified. User is not registered.',
-            'data' => ['is_registered' => false, 'mobile' => $mobile],
+            'data' => [
+                'is_registered' => false,
+                'mobile' => $mobile
+            ]
         ]);
         exit;
     }
@@ -47,8 +55,8 @@ try {
         'message' => 'OTP verified successfully',
         'data' => [
             'is_registered' => true,
-            'user' => $user,
-        ],
+            'user' => $user
+        ]
     ]);
 } catch (Throwable $e) {
     http_response_code(500);
