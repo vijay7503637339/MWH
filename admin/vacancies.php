@@ -54,6 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $payoutPeriod = trim((string)($_POST['payout_period'] ?? 'per_job'));
             $workingHours = trim((string)($_POST['working_hours'] ?? ''));
             $requirements = trim((string)($_POST['requirements'] ?? ''));
+            $responsibilities = trim((string)($_POST['responsibilities'] ?? ''));
+            $dressCode = trim((string)($_POST['dress_code'] ?? ''));
             $status = (string)($_POST['status'] ?? 'draft');
 
             if ($hotelId <= 0) throw new RuntimeException('Please select a hotel.');
@@ -88,12 +90,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $publishedAt = $existing['published_at'];
                 }
 
-                $stmt = $pdo->prepare('UPDATE vacancies SET hotel_id=?, category_id=?, job_role_id=?, title=?, description=?, openings_count=?, payout_amount=?, payout_period=?, working_hours=?, requirements=?, status=?, published_at=? WHERE id=?');
-                $stmt->execute([$hotelId, $categoryId, $jobRoleId, $title, $description !== '' ? $description : null, $openings, number_format((float)$payoutAmount, 2, '.', ''), $payoutPeriod, $workingHours !== '' ? $workingHours : null, $requirements !== '' ? $requirements : null, $status, $publishedAt, $vacancyId]);
+                $stmt = $pdo->prepare('UPDATE vacancies SET hotel_id=?, category_id=?, job_role_id=?, title=?, description=?, openings_count=?, payout_amount=?, payout_period=?, working_hours=?, requirements=?, responsibilities=?, dress_code=?, status=?, published_at=? WHERE id=?');
+                $stmt->execute([$hotelId, $categoryId, $jobRoleId, $title, $description !== '' ? $description : null, $openings, number_format((float)$payoutAmount, 2, '.', ''), $payoutPeriod, $workingHours !== '' ? $workingHours : null, $requirements !== '' ? $requirements : null, $responsibilities !== '' ? $responsibilities : null, $dressCode !== '' ? $dressCode : null, $status, $publishedAt, $vacancyId]);
                 $_SESSION['vacancy_success'] = 'Vacancy updated successfully.';
             } else {
-                $stmt = $pdo->prepare('INSERT INTO vacancies (hotel_id, category_id, job_role_id, title, description, openings_count, payout_amount, payout_period, working_hours, requirements, status, published_at, created_by_admin_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-                $stmt->execute([$hotelId, $categoryId, $jobRoleId, $title, $description !== '' ? $description : null, $openings, number_format((float)$payoutAmount, 2, '.', ''), $payoutPeriod, $workingHours !== '' ? $workingHours : null, $requirements !== '' ? $requirements : null, $status, $publishedAt, $admin['id']]);
+                $stmt = $pdo->prepare('INSERT INTO vacancies (hotel_id, category_id, job_role_id, title, description, openings_count, payout_amount, payout_period, working_hours, requirements, responsibilities, dress_code, status, published_at, created_by_admin_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$hotelId, $categoryId, $jobRoleId, $title, $description !== '' ? $description : null, $openings, number_format((float)$payoutAmount, 2, '.', ''), $payoutPeriod, $workingHours !== '' ? $workingHours : null, $requirements !== '' ? $requirements : null, $responsibilities !== '' ? $responsibilities : null, $dressCode !== '' ? $dressCode : null, $status, $publishedAt, $admin['id']]);
                 $_SESSION['vacancy_success'] = 'Vacancy added successfully.';
             }
             redirectVacancies();
@@ -210,12 +212,14 @@ require __DIR__ . '/includes/sidebar.php';
             <div class="field"><label>Service / Job Role *</label><select name="job_role_id" id="jobRoleSelect" required><option value="">Select service</option><?php foreach ($jobRoles as $role): ?><option data-category="<?= (int)$role['category_id'] ?>" value="<?= (int)$role['id'] ?>" <?= ((int)($editVacancy['job_role_id'] ?? 0) === (int)$role['id']) ? 'selected' : '' ?>><?= e($role['name']) ?></option><?php endforeach; ?></select></div>
 
             <div class="field"><label>Vacancy Title *</label><input type="text" name="title" required maxlength="190" placeholder="e.g. Tandoor Chef" value="<?= e($editVacancy['title'] ?? '') ?>"></div>
-            <div class="field full"><label>Description</label><textarea name="description" rows="4" maxlength="10000" placeholder="Describe the job and responsibilities..."><?= e($editVacancy['description'] ?? '') ?></textarea></div>
+            <div class="field full"><label>Description</label><textarea name="description" rows="4" maxlength="10000" placeholder="Describe the job..."><?= e($editVacancy['description'] ?? '') ?></textarea></div>
             <div class="field"><label>Number of Openings *</label><input type="number" name="openings_count" min="1" max="100000" required value="<?= e((string)($editVacancy['openings_count'] ?? 1)) ?>"></div>
             <div class="field"><label>Payout Amount *</label><input type="number" name="payout_amount" min="0" step="0.01" required value="<?= e((string)($editVacancy['payout_amount'] ?? '')) ?>"></div>
             <div class="field"><label>Payout Period *</label><select name="payout_period"><option value="per_job" <?= (($editVacancy['payout_period'] ?? 'per_job') === 'per_job') ? 'selected' : '' ?>>Per Job</option><option value="per_day" <?= (($editVacancy['payout_period'] ?? '') === 'per_day') ? 'selected' : '' ?>>Per Day</option><option value="per_month" <?= (($editVacancy['payout_period'] ?? '') === 'per_month') ? 'selected' : '' ?>>Per Month</option></select></div>
             <div class="field"><label>Working Hours</label><input type="number" name="working_hours" min="0" max="24" step="0.5" value="<?= e((string)($editVacancy['working_hours'] ?? '')) ?>" placeholder="e.g. 8"></div>
             <div class="field full"><label>Requirements</label><textarea name="requirements" rows="4" maxlength="10000" placeholder="Experience, skills, documents or other requirements..."><?= e($editVacancy['requirements'] ?? '') ?></textarea></div>
+            <div class="field full"><label>Responsibilities</label><textarea name="responsibilities" rows="5" maxlength="10000" placeholder="Enter responsibilities, one per line..."><?= e($editVacancy['responsibilities'] ?? '') ?></textarea><span class="muted small">Tip: Add each responsibility on a new line.</span></div>
+            <div class="field full"><label>Dress Code</label><textarea name="dress_code" rows="3" maxlength="5000" placeholder="e.g. Black Suit & Tie\nStrictly enforced"><?= e($editVacancy['dress_code'] ?? '') ?></textarea></div>
             <div class="field"><label>Status</label><select name="status"><option value="draft" <?= (($editVacancy['status'] ?? 'draft') === 'draft') ? 'selected' : '' ?>>Draft</option><option value="published" <?= (($editVacancy['status'] ?? '') === 'published') ? 'selected' : '' ?>>Published</option><option value="closed" <?= (($editVacancy['status'] ?? '') === 'closed') ? 'selected' : '' ?>>Closed</option></select></div>
             <div class="field full form-actions"><button type="submit"><?= $editVacancy ? 'Update Vacancy' : 'Save Vacancy' ?></button><a class="button-secondary" href="vacancies.php">Cancel</a></div>
         </form>
