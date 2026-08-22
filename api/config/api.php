@@ -38,18 +38,18 @@ function issueToken(PDO $pdo, int $userId): string {
     $stmt->execute([$userId,$hash]); return $token;
 }
 
-function publicUploadUrl(string $storagePath): string {
-    $storagePath = ltrim($storagePath, '/');
-    return 'https://webstripetechnologies.com/MWH/api/' . $storagePath;
+function publicHotelImageUrl(int $imageId): string {
+    return 'https://webstripetechnologies.com/MWH/api/media/hotel_image.php?id=' . $imageId;
 }
 
 function mapHotelImages(array $images): array {
     return array_map(static function (array $image): array {
         $storagePath = ltrim((string)$image['storage_path'], '/');
+        $id = (int)$image['id'];
         return [
-            'id' => (int)$image['id'],
+            'id' => $id,
             'storage_path' => $storagePath,
-            'url' => publicUploadUrl($storagePath),
+            'url' => publicHotelImageUrl($id),
             'original_file_name' => $image['original_file_name'],
             'is_primary' => (bool)$image['is_primary'],
             'sort_order' => (int)$image['sort_order'],

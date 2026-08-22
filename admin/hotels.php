@@ -15,7 +15,7 @@ if (empty($_SESSION['hotel_csrf'])) {
 $csrf = $_SESSION['hotel_csrf'];
 
 $uploadDir = __DIR__ . '/../api/uploads/hotels';
-$uploadUrl = '../api/uploads/hotels';
+$imageViewUrl = '../api/media/hotel_image.php?id=';
 $allowedMimes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
 $errors = [];
 $success = $_SESSION['hotel_success'] ?? '';
@@ -164,7 +164,7 @@ $editHotel = null;
 if (isset($_GET['edit'])) {
     $editId = (int)$_GET['edit'];
     if ($editId > 0) {
-        $stmt = $pdo->prepare('SELECT h.*, hi.storage_path AS image_path FROM hotels h LEFT JOIN hotel_images hi ON hi.hotel_id=h.id AND hi.is_primary=1 WHERE h.id=? LIMIT 1');
+        $stmt = $pdo->prepare('SELECT h.*, hi.id AS image_id, hi.storage_path AS image_path FROM hotels h LEFT JOIN hotel_images hi ON hi.hotel_id=h.id AND hi.is_primary=1 WHERE h.id=? LIMIT 1');
         $stmt->execute([$editId]);
         $editHotel = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
@@ -174,7 +174,7 @@ $search = trim((string)($_GET['search'] ?? ''));
 $statusFilter = (string)($_GET['status'] ?? 'active');
 $showForm = isset($_GET['add']) || $editHotel !== null || !empty($errors);
 
-$sql = "SELECT h.*, hi.storage_path AS image_path,
+$sql = "SELECT h.*, hi.id AS image_id, hi.storage_path AS image_path,
         (SELECT COUNT(*) FROM vacancies v WHERE v.hotel_id=h.id AND v.deleted_at IS NULL) AS vacancy_count
         FROM hotels h
         LEFT JOIN hotel_images hi ON hi.hotel_id=h.id AND hi.is_primary=1
@@ -245,8 +245,8 @@ require __DIR__ . '/includes/sidebar.php';
             <div class="field"><label>Status</label><select name="status"><option value="active" <?= (($editHotel['status'] ?? 'active') === 'active') ? 'selected' : '' ?>>Active</option><option value="inactive" <?= (($editHotel['status'] ?? '') === 'inactive') ? 'selected' : '' ?>>Inactive</option></select></div>
             <div class="field"><label>Hotel Image</label><input type="file" name="image" accept="image/jpeg,image/png,image/webp"><small>JPG, PNG or WebP, max 5 MB.</small></div>
 
-            <?php if (!empty($editHotel['image_path'])): ?>
-                <div class="field full current-image"><label>Current Image</label><a href="<?= e($uploadUrl . '/' . basename((string)$editHotel['image_path'])) ?>" target="_blank" rel="noopener"><img class="hotel-preview large" src="<?= e($uploadUrl . '/' . basename((string)$editHotel['image_path'])) ?>" alt="Hotel image"></a><small>Click image to open full size.</small></div>
+            <?php if (!empty($editHotel['image_id'])): ?>
+                <div class="field full current-image"><label>Current Image</label><a href="<?= e($imageViewUrl . (int)$editHotel['image_id']) ?>" target="_blank" rel="noopener"><img class="hotel-preview large" src="<?= e($imageViewUrl . (int)$editHotel['image_id']) ?>" alt="Hotel image"></a><small>Click image to open full size.</small></div>
             <?php endif; ?>
 
             <div class="field full form-actions"><button type="submit"><?= $editHotel ? 'Update Hotel' : 'Save Hotel' ?></button><a class="button-secondary" href="hotels.php">Cancel</a></div>
@@ -279,8 +279,8 @@ require __DIR__ . '/includes/sidebar.php';
                         <tr>
                             <td><strong><?= e($hotel['name']) ?></strong></td>
                             <td>
-                                <?php if (!empty($hotel['image_path'])): ?>
-                                    <a class="image-cell" href="<?= e($uploadUrl . '/' . basename((string)$hotel['image_path'])) ?>" target="_blank" rel="noopener"><img class="hotel-thumb" src="<?= e($uploadUrl . '/' . basename((string)$hotel['image_path'])) ?>" alt="<?= e($hotel['name']) ?>"><span>View</span></a>
+                                <?php if (!empty($hotel['image_id'])): ?>
+                                    <a class="image-cell" href="<?= e($imageViewUrl . (int)$hotel['image_id']) ?>" target="_blank" rel="noopener"><img class="hotel-thumb" src="<?= e($imageViewUrl . (int)$hotel['image_id']) ?>" alt="<?= e($hotel['name']) ?>"><span>View</span></a>
                                 <?php else: ?><span class="muted small">No image</span><?php endif; ?>
                             </td>
                             <td><?= e(trim(($hotel['city'] ?? '') . (($hotel['state'] ?? '') ? ', ' . $hotel['state'] : ''))) ?></td>
