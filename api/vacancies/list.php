@@ -15,6 +15,9 @@ $category = (int)($_GET['category_id'] ?? 0);
 $role = (int)($_GET['job_role_id'] ?? 0);
 $city = trim((string)($_GET['city'] ?? ''));
 
+// Public URL used by the mobile app for files stored under /MWH/.
+$publicBaseUrl = 'https://webstripetechnologies.com/MWH/';
+
 $where = "v.status = 'published' AND v.deleted_at IS NULL
           AND h.status = 'active' AND h.deleted_at IS NULL";
 $params = [];
@@ -139,10 +142,14 @@ foreach ($rows as $row) {
             'country' => $row['hotel_country'],
             'latitude' => $row['hotel_latitude'] !== null ? (float)$row['hotel_latitude'] : null,
             'longitude' => $row['hotel_longitude'] !== null ? (float)$row['hotel_longitude'] : null,
-            'images' => array_map(static function (array $image): array {
+            'images' => array_map(static function (array $image) use ($publicBaseUrl): array {
+                $storagePath = ltrim((string)$image['storage_path'], '/');
+                $imageUrl = $publicBaseUrl . $storagePath;
+
                 return [
                     'id' => (int)$image['id'],
-                    'storage_path' => $image['storage_path'],
+                    'storage_path' => $storagePath,
+                    'url' => $imageUrl,
                     'original_file_name' => $image['original_file_name'],
                     'is_primary' => (bool)$image['is_primary'],
                     'sort_order' => (int)$image['sort_order'],
