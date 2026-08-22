@@ -1,0 +1,204 @@
+/* MWH Admin responsive shell
+   One shared responsive layer for every admin module.
+   Desktop layout remains unchanged; mobile uses a drawer navigation. */
+
+.mwh-menu-button {
+    display: none !important;
+    width: 42px !important;
+    min-width: 42px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid #e6eaf1 !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+    color: #69758a !important;
+    box-shadow: 0 4px 14px rgba(25,42,70,.06) !important;
+}
+
+.mwh-menu-button:hover {
+    color: #3f6ff0 !important;
+    border-color: #cbd6ee !important;
+    transform: none !important;
+}
+
+@media (max-width: 900px) {
+    html, body { width: 100%; min-width: 0; overflow-x: hidden; }
+
+    .app-shell {
+        display: block !important;
+        min-height: 100vh !important;
+    }
+
+    .mwh-topbar {
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: 68px !important;
+        min-height: 68px !important;
+        padding: 0 14px !important;
+        z-index: 1001 !important;
+    }
+
+    .mwh-menu-button { display: grid !important; place-items: center !important; }
+    .mwh-topbar-title { display: none !important; }
+    .mwh-topbar-actions { margin-left: auto !important; }
+    .mwh-topbar-user-copy { display: none !important; }
+    .mwh-topbar-user { padding-left: 0 !important; }
+    .mwh-topbar-avatar { width: 42px !important; height: 42px !important; border-radius: 12px !important; }
+
+    .sidebar {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        width: min(290px, 86vw) !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        transform: translate3d(-105%, 0, 0) !important;
+        transition: transform .24s ease !important;
+        z-index: 1003 !important;
+        padding: 18px 12px 14px !important;
+    }
+
+    body.nav-open .sidebar {
+        transform: translate3d(0, 0, 0) !important;
+    }
+
+    body.nav-open::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: rgba(10,20,35,.46);
+        z-index: 1002;
+    }
+
+    body.nav-open { overflow: hidden; }
+
+    .admin-nav a {
+        min-height: 46px !important;
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .admin-nav a.active::before { left: -12px !important; }
+
+    .content,
+    .app-shell > main.content,
+    main.content.applications-page {
+        display: block !important;
+        position: relative !important;
+        top: auto !important;
+        bottom: auto !important;
+        left: auto !important;
+        right: auto !important;
+        margin: 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 100vh !important;
+        height: auto !important;
+        padding: 88px 18px 32px !important;
+        transform: none !important;
+    }
+
+    /* Prevent any module from pushing its first content block to the bottom. */
+    main.content.dashboard-modern,
+    main.content.mwh-standard-module,
+    main.content.applications-page {
+        display: block !important;
+        align-content: flex-start !important;
+        justify-content: flex-start !important;
+    }
+
+    .dashboard-modern .dashboard-welcome {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 0 18px !important;
+        padding: 0 !important;
+    }
+
+    .dashboard-modern .dashboard-welcome h1 { margin: 0 0 6px !important; }
+    .dashboard-modern .dashboard-welcome p { margin: 0 !important; }
+
+    /* Dashboard should use the same compact module rhythm on mobile. */
+    .dashboard-modern .dashboard-cards,
+    .mwh-standard-dashboard .dashboard-cards,
+    .mwh-module-stats {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    .dashboard-modern .dashboard-card,
+    .mwh-module-stat-card { min-width: 0 !important; }
+
+    main.content > .topbar {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 0 16px !important;
+        padding: 0 !important;
+        gap: 12px !important;
+    }
+
+    .mwh-standard-module > .topbar .mwh-module-count {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        width: auto !important;
+        min-width: 0 !important;
+        padding: 8px 13px !important;
+    }
+
+    .mwh-standard-module > .topbar .mwh-module-count strong,
+    .mwh-standard-module > .topbar .mwh-module-count span { display: inline !important; margin: 0 !important; }
+
+    .mwh-standard-module .filter-form.mwh-standard-filter,
+    main.content .filter-form {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+        gap: 9px !important;
+    }
+
+    .mwh-standard-module .filter-form.mwh-standard-filter input,
+    .mwh-standard-module .filter-form.mwh-standard-filter select,
+    .mwh-standard-module .filter-form.mwh-standard-filter button,
+    main.content .filter-form input,
+    main.content .filter-form select,
+    main.content .filter-form button {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    .table-wrap,
+    .application-table-wrap { max-width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+    .quick-links { grid-template-columns: 1fr !important; padding: 0 16px 16px !important; }
+
+    .panel { max-width: 100% !important; }
+}
+
+@media (max-width: 600px) {
+    .mwh-topbar { padding: 0 12px !important; }
+    .content,
+    .app-shell > main.content,
+    main.content.applications-page { padding: 84px 14px 26px !important; }
+    .mwh-module-kicker { font-size: 9px !important; }
+    main.content > .topbar h1,
+    .mwh-standard-module > .topbar h1,
+    .dashboard-modern .dashboard-welcome h1 { font-size: 28px !important; }
+    .panel-header { gap: 10px !important; }
+}
