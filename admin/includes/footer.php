@@ -16,14 +16,38 @@ if (logoutLink) {
 }
 
 const mobileMenuButton = document.getElementById('mobileMenuButton');
+const closeMobileMenu = () => {
+    document.body.classList.remove('nav-open');
+    if (mobileMenuButton) mobileMenuButton.setAttribute('aria-expanded', 'false');
+};
+
 if (mobileMenuButton) {
-    mobileMenuButton.addEventListener('click', () => document.body.classList.toggle('nav-open'));
+    mobileMenuButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const open = !document.body.classList.contains('nav-open');
+        document.body.classList.toggle('nav-open', open);
+        mobileMenuButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
 }
+
+document.querySelectorAll('.admin-nav a').forEach((link) => {
+    link.addEventListener('click', () => {
+        if (window.innerWidth <= 900) closeMobileMenu();
+    });
+});
 
 document.addEventListener('click', (event) => {
     if (window.innerWidth > 900 || !document.body.classList.contains('nav-open')) return;
     if (event.target.closest('.sidebar') || event.target.closest('#mobileMenuButton')) return;
-    document.body.classList.remove('nav-open');
+    closeMobileMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && document.body.classList.contains('nav-open')) closeMobileMenu();
+});
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 900) closeMobileMenu();
 });
 
 const categorySelect = document.getElementById('categorySelect');
