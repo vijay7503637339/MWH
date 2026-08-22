@@ -20,12 +20,13 @@ $pageTitle = $pageTitle ?? 'MWH Admin';
     <link rel="stylesheet" href="assets/metis-theme.css">
     <link rel="stylesheet" href="assets/layout-fix.css">
     <link rel="stylesheet" href="assets/module-theme.css?v=2">
+    <link rel="stylesheet" href="assets/responsive-admin.css?v=1">
 </head>
 <body class="admin-page">
 <div class="app-shell">
 <header class="mwh-topbar">
     <div class="d-flex align-items-center gap-2">
-        <button type="button" class="mwh-icon-button mwh-menu-button" id="mobileMenuButton" aria-label="Open menu">
+        <button type="button" class="mwh-icon-button mwh-menu-button" id="mobileMenuButton" aria-label="Open menu" aria-expanded="false">
             <i class="bi bi-list"></i>
         </button>
         <div class="mwh-topbar-title">Maan World Hospitality &nbsp; / &nbsp; <?= htmlspecialchars($pageTitle) ?></div>
@@ -40,4 +41,4 @@ $pageTitle = $pageTitle ?? 'MWH Admin';
         </div>
     </div>
 </header>
-<script src="assets/module-ui.js?v=2" defer></script>
+<script src="assets/module-ui.js?v=3" defer></script>
