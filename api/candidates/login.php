@@ -21,7 +21,12 @@ if ($mobile === '') {
 }
 
 try {
-    $stmt = $pdo->prepare('SELECT id, name, email, mobile, status FROM users WHERE mobile = ? LIMIT 1');
+    $stmt = $pdo->prepare(
+        'SELECT id, email, mobile, account_status
+         FROM users
+         WHERE mobile = ? AND deleted_at IS NULL
+         LIMIT 1'
+    );
     $stmt->execute([$mobile]);
     $user = $stmt->fetch();
 
@@ -31,9 +36,13 @@ try {
         exit;
     }
 
-    if (isset($user['status']) && !in_array(strtolower((string)$user['status']), ['active', 'approved'], true)) {
+    $accountStatus = strtolower((string)$user['account_status']);
+    if (in_array($accountStatus, ['blocked', 'rejected'], true)) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Account is not active']);
+        echo json_encode([
+            'success' => false,
+            'message' => $accountStatus === 'blocked' ? 'Account is blocked' : 'Account is rejected'
+        ]);
         exit;
     }
 
@@ -42,8 +51,17 @@ try {
     $expiresAt = date('Y-m-d H:i:s', time() + 60 * 60 * 24 * 30);
 
     $pdo->beginTransaction();
-    $pdo->prepare('UPDATE api_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL')->execute([$user['id']]);
-    $pdo->prepare('INSERT INTO api_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)')->execute([$user['id'], $tokenHash, $expiresAt]);
+    $pdo->prepare(
+        'UPDATE api_tokens
+         SET revoked_at = CURRENT_TIMESTAMP
+         WHERE user_id = ? AND revoked_at IS NULL'
+    )->execute([$user['id']]);
+
+    $pdo->prepare(
+        'INSERT INTO api_tokens (user_id, token_hash, expires_at)
+         VALUES (?, ?, ?)'
+    )->execute([$user['id'], $tokenHash, $expiresAt]);
+
     $pdo->commit();
 
     echo json_encode([
