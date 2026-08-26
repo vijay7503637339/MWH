@@ -13,8 +13,11 @@ try {
  $password=requiredString($data,'password',255); if(strlen($password)<8) throw new InvalidArgumentException('Password must be at least 8 characters');
  $email=trim((string)($data['email']??'')); if($email!==''&&!filter_var($email,FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Invalid email address');
  $firstName=requiredString($data,'first_name',100); $lastName=requiredString($data,'last_name',100);
- $dateOfBirth=trim((string)($data['date_of_birth']??''))?:null; $gender=trim((string)($data['gender']??''))?:null; $fullAddress=trim((string)($data['full_address']??''))?:null; $city=trim((string)($data['city']??''))?:null; $postcode=trim((string)($data['postcode']??''))?:null;
- $experienceYears=(float)($data['experience_years']??0); if($experienceYears<0||$experienceYears>99.9) throw new InvalidArgumentException('Invalid experience_years');
+ $dateOfBirth=trim((string)($data['date_of_birth']??$data['dob']??''))?:null; $gender=trim((string)($data['gender']??''))?:null; $fullAddress=trim((string)($data['full_address']??''))?:null;
+ $preferredArea=trim((string)($data['preferred_area']??''))?:null;
+ $city=trim((string)($data['city']??$preferredArea??''))?:null;
+ $postcode=trim((string)($data['postcode']??''))?:null;
+ $experienceYears=(float)($data['experience_years']??$data['experience']??0); if($experienceYears<0||$experienceYears>99.9) throw new InvalidArgumentException('Invalid experience_years');
  $categoryId=(int)($data['category_id']??0); $jobRoleId=(int)($data['job_role_id']??0); if($categoryId<=0||$jobRoleId<=0) throw new InvalidArgumentException('category_id and job_role_id are required');
  $paymentType=trim((string)($data['payment_type']??'')); if(!in_array($paymentType,['bank','upi'],true)) throw new InvalidArgumentException('payment_type must be bank or upi');
  $pdo->beginTransaction();
@@ -25,7 +28,7 @@ try {
  $stmt=$pdo->prepare('INSERT INTO candidate_profiles(user_id,first_name,last_name,date_of_birth,gender,full_address,city,country,postcode) VALUES(?,?,?,?,?,?,?,?,?)'); $stmt->execute([$userId,$firstName,$lastName,$dateOfBirth,$gender,$fullAddress,$city,'India',$postcode]);
  $previousCompany=trim((string)($data['previous_company_name']??''))?:null; $stmt=$pdo->prepare('INSERT INTO professional_details(user_id,experience_years,previous_company_name) VALUES(?,?,?)'); $stmt->execute([$userId,$experienceYears,$previousCompany]);
  $travelDistance=isset($data['max_travel_distance_km'])?(float)$data['max_travel_distance_km']:null; $workingHours=isset($data['preferred_working_hours'])?(float)$data['preferred_working_hours']:null; $stmt=$pdo->prepare('INSERT INTO job_preferences(user_id,category_id,job_role_id,max_travel_distance_km,preferred_working_hours) VALUES(?,?,?,?,?)'); $stmt->execute([$userId,$categoryId,$jobRoleId,$travelDistance,$workingHours]);
- $accountNumber=trim((string)($data['account_number']??''))?:null; $upiId=trim((string)($data['upi_id']??''))?:null; $ifsc=trim((string)($data['ifsc_code']??''))?:null; $bankName=trim((string)($data['bank_name']??''))?:null; $accountHolder=trim((string)($data['account_holder_name']??''))?:null; $branchName=trim((string)($data['branch_name']??''))?:null;
+ $accountNumber=trim((string)($data['account_number']??''))?:null; $upiId=trim((string)($data['upi_id']??''))?:null; $ifsc=trim((string)($data['ifsc_code']??$data['ifsc']??''))?:null; $bankName=trim((string)($data['bank_name']??''))?:null; $accountHolder=trim((string)($data['account_holder_name']??''))?:null; $branchName=trim((string)($data['branch_name']??''))?:null;
  if($paymentType==='bank'&&($accountNumber===null||$ifsc===null)) throw new InvalidArgumentException('Bank account number and IFSC are required'); if($paymentType==='upi'&&$upiId===null) throw new InvalidArgumentException('UPI ID is required');
  $encryptedAccount=$accountNumber!==null?encryptSensitive($accountNumber):null; $stmt=$pdo->prepare('INSERT INTO candidate_payment_profiles(user_id,payment_type,account_holder_name,bank_name,account_number_encrypted,ifsc_code,branch_name,upi_id) VALUES(?,?,?,?,?,?,?,?)'); $stmt->execute([$userId,$paymentType,$accountHolder,$bankName,$encryptedAccount,$ifsc,$branchName,$upiId]);
  $pdo->commit(); http_response_code(201); echo json_encode(['success'=>true,'message'=>'Candidate signup submitted for verification','data'=>['user_id'=>$userId,'account_status'=>'pending_verification']]);
