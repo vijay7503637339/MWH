@@ -47,8 +47,8 @@ try {
             ) AS hotel_image_path,
             j.id AS job_id,
             j.status AS job_status,
-            j.scheduled_start_at,
-            j.scheduled_end_at
+            j.start_date,
+            j.end_date
          FROM applications a
          INNER JOIN vacancies v ON v.id = a.vacancy_id
          INNER JOIN hotels h ON h.id = v.hotel_id
@@ -91,8 +91,8 @@ try {
             'job' => $row['job_id'] !== null ? [
                 'id' => (int)$row['job_id'],
                 'status' => $row['job_status'],
-                'scheduled_start_at' => $row['scheduled_start_at'],
-                'scheduled_end_at' => $row['scheduled_end_at'],
+                'start_date' => $row['start_date'],
+                'end_date' => $row['end_date'],
             ] : null,
         ];
     }
