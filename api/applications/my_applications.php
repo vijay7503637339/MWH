@@ -55,6 +55,12 @@ try {
             j.assigned_at,
             j.notes AS job_notes,
             j.completed_at,
+            CASE WHEN j.id IS NOT NULL AND j.payout_amount <= COALESCE((
+                SELECT SUM(p.amount) FROM payments p WHERE p.job_id = j.id AND p.user_id = a.user_id
+            ), 0) THEN 'paid' ELSE 'unpaid' END AS job_payment_status,
+            COALESCE((
+                SELECT SUM(p.amount) FROM payments p WHERE p.job_id = j.id AND p.user_id = a.user_id
+            ), 0) AS job_paid_amount,
             ar.id AS attendance_id,
             ar.check_in_at,
             ar.check_out_at,
@@ -110,6 +116,8 @@ try {
             'job' => $row['job_id'] !== null ? [
                 'id' => (int)$row['job_id'],
                 'status' => $row['job_status'],
+                'payment_status' => $row['job_payment_status'],
+                'paid_amount' => (float)$row['job_paid_amount'],
                 'start_date' => $row['start_date'],
                 'end_date' => $row['end_date'],
                 'start_time' => $row['start_time'],
