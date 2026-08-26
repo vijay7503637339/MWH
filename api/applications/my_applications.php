@@ -48,11 +48,25 @@ try {
             j.id AS job_id,
             j.status AS job_status,
             j.start_date,
-            j.end_date
+            j.end_date,
+            j.completed_at,
+            ar.id AS attendance_id,
+            ar.check_in_at,
+            ar.check_out_at,
+            ROUND(TIMESTAMPDIFF(SECOND, ar.check_in_at, COALESCE(ar.check_out_at, UTC_TIMESTAMP())) / 3600, 2) AS worked_hours,
+            ar.check_in_latitude,
+            ar.check_in_longitude
          FROM applications a
          INNER JOIN vacancies v ON v.id = a.vacancy_id
          INNER JOIN hotels h ON h.id = v.hotel_id
          LEFT JOIN jobs j ON j.application_id = a.id
+         LEFT JOIN attendance_records ar ON ar.id = (
+             SELECT ar2.id
+             FROM attendance_records ar2
+             WHERE ar2.job_id = j.id AND ar2.user_id = a.user_id
+             ORDER BY ar2.id DESC
+             LIMIT 1
+         )
          WHERE a.user_id = ?
            AND v.deleted_at IS NULL
            AND h.deleted_at IS NULL
@@ -93,6 +107,15 @@ try {
                 'status' => $row['job_status'],
                 'start_date' => $row['start_date'],
                 'end_date' => $row['end_date'],
+                'completed_at' => $row['completed_at'],
+            ] : null,
+            'attendance' => $row['attendance_id'] !== null ? [
+                'id' => (int)$row['attendance_id'],
+                'check_in_at' => $row['check_in_at'],
+                'check_out_at' => $row['check_out_at'],
+                'worked_hours' => $row['worked_hours'] !== null ? (float)$row['worked_hours'] : null,
+                'latitude' => $row['check_in_latitude'] !== null ? (float)$row['check_in_latitude'] : null,
+                'longitude' => $row['check_in_longitude'] !== null ? (float)$row['check_in_longitude'] : null,
             ] : null,
         ];
     }
