@@ -38,6 +38,9 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <a class="<?= $currentPage === 'payments.php' ? 'active' : '' ?>" href="payments.php">
             <span class="nav-icon"><i class="bi bi-wallet2"></i></span><span>Payments</span>
         </a>
+        <a class="<?= $currentPage === 'notifications.php' ? 'active' : '' ?>" href="notifications.php">
+            <span class="nav-icon"><i class="bi bi-bell-fill"></i></span><span>Notifications</span>
+        </a>
     </nav>
 
     <div class="sidebar-bottom">
