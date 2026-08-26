@@ -37,7 +37,8 @@ try {
         respond(['success' => false, 'message' => 'Job not found'], 404);
     }
 
-    if (!in_array((string)$job['status'], ['assigned', 'upcoming'], true)) {
+    $jobStatus = strtolower(trim((string)$job['status']));
+    if (!in_array($jobStatus, ['assigned', 'upcoming', 'scheduled', 'confirmed'], true)) {
         $pdo->rollBack();
         respond(['success' => false, 'message' => 'This job cannot be checked in now'], 409);
     }
