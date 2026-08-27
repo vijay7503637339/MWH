@@ -11,6 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     respond(['success'=>true,'data'=>['availability_status'=>$row['availability_status'] ?? 'available','available'=>($row['availability_status'] ?? 'available') === 'available']]);
 }
 
+// Some production hosts/WAFs reject PATCH requests even though the API supports them.
+// Accept POST as the canonical mobile update method as well.
 if ($_SERVER['REQUEST_METHOD'] === 'PATCH' || $_SERVER['REQUEST_METHOD'] === 'POST') {
     $d = jsonInput();
     $value = strtolower(trim((string)($d['availability_status'] ?? ($d['available'] ?? ''))));
