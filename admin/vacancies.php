@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $existing = $check->fetch(PDO::FETCH_ASSOC);
                 if (!$existing) throw new RuntimeException('Vacancy not found.');
 
-                if ($status === 'published' && empty($existing['published_at'])) {
+                if ($status === 'published') {
                     $publishedAt = date('Y-m-d H:i:s');
                 } elseif ($status !== 'published') {
                     $publishedAt = $existing['published_at'];
@@ -102,7 +102,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'publish' && $vacancyId > 0) {
-            $stmt = $pdo->prepare("UPDATE vacancies SET status='published', published_at=COALESCE(published_at, NOW()), closing_at=NULL WHERE id=? AND deleted_at IS NULL");
+            // Re-publishing a closed vacancy must reset published_at to NOW().
+            // Otherwise Apply API can reject it as "not open yet" when the old
+            // published_at value is in the future relative to the current time.
+            $stmt = $pdo->prepare("UPDATE vacancies SET status='published', published_at=NOW(), closing_at=NULL WHERE id=? AND deleted_at IS NULL");
             $stmt->execute([$vacancyId]);
             $_SESSION['vacancy_success'] = 'Vacancy published successfully.';
             redirectVacancies();
@@ -220,39 +223,50 @@ require __DIR__ . '/includes/sidebar.php';
             <div class="field full"><label>Requirements</label><textarea name="requirements" rows="4" maxlength="10000" placeholder="Experience, skills, documents or other requirements..."><?= e($editVacancy['requirements'] ?? '') ?></textarea></div>
             <div class="field full"><label>Responsibilities</label><textarea name="responsibilities" rows="5" maxlength="10000" placeholder="Enter responsibilities, one per line..."><?= e($editVacancy['responsibilities'] ?? '') ?></textarea><span class="muted small">Tip: Add each responsibility on a new line.</span></div>
             <div class="field full"><label>Dress Code</label><textarea name="dress_code" rows="3" maxlength="5000" placeholder="e.g. Black Suit & Tie\nStrictly enforced"><?= e($editVacancy['dress_code'] ?? '') ?></textarea></div>
-            <div class="field"><label>Status</label><select name="status"><option value="draft" <?= (($editVacancy['status'] ?? 'draft') === 'draft') ? 'selected' : '' ?>>Draft</option><option value="published" <?= (($editVacancy['status'] ?? '') === 'published') ? 'selected' : '' ?>>Published</option><option value="closed" <?= (($editVacancy['status'] ?? '') === 'closed') ? 'selected' : '' ?>>Closed</option></select></div>
-            <div class="field full form-actions"><button type="submit"><?= $editVacancy ? 'Update Vacancy' : 'Save Vacancy' ?></button><a class="button-secondary" href="vacancies.php">Cancel</a></div>
+            <div class="field"><label>Status</label><select name="status"><option value="draft" <?= (($editVacancy['status'] ?? 'draft') === 'draft') ? 'selected' : '' ?>>Draft</option><option value="published" <?= (($editVacancy['status'] ?? 'draft') === 'published') ? 'selected' : '' ?>>Published</option><option value="closed" <?= (($editVacancy['status'] ?? 'draft') === 'closed') ? 'selected' : '' ?>>Closed</option></select></div>
+            <div class="field full"><button class="button-link" type="submit"><?= $editVacancy ? 'Update Vacancy' : 'Create Vacancy' ?></button></div>
         </form>
     </section>
     <?php endif; ?>
 
-    <section class="section vacancies-list-section">
-        <div class="panel-header">
-            <div><h2>Vacancy List</h2><p class="muted small"><?= count($vacancies) ?> vacancy(s) found.</p></div>
-            <form method="get" class="filter-form"><input type="search" name="search" placeholder="Search vacancy, hotel, category..." value="<?= e($search) ?>"><select name="status"><option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>All Vacancies</option><option value="published" <?= $statusFilter === 'published' ? 'selected' : '' ?>>Published</option><option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option><option value="closed" <?= $statusFilter === 'closed' ? 'selected' : '' ?>>Closed</option></select><button type="submit">Search</button></form>
-        </div>
+    <?php if (!$showForm): ?>
+    <section class="panel">
+        <form class="filters" method="get">
+            <input type="text" name="search" placeholder="Search vacancies..." value="<?= e($search) ?>">
+            <select name="status"><option value="all">All statuses</option><option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option><option value="published" <?= $statusFilter === 'published' ? 'selected' : '' ?>>Published</option><option value="closed" <?= $statusFilter === 'closed' ? 'selected' : '' ?>>Closed</option></select>
+            <button class="button-secondary" type="submit">Filter</button>
+            <a class="button-secondary" href="vacancies.php">Clear</a>
+        </form>
 
-        <div class="table-wrap"><table class="data-table"><thead><tr><th>Vacancy</th><th>Hotel</th><th>Category / Service</th><th>Openings</th><th>Payout</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>
-        <?php if (!$vacancies): ?><tr><td colspan="8" class="table-empty">No vacancies found.</td></tr>
-        <?php else: foreach ($vacancies as $vacancy): ?>
-            <tr>
-                <td><strong><?= e($vacancy['title']) ?></strong><br><span class="muted small"><?= e($vacancy['description'] ? mb_strimwidth($vacancy['description'], 0, 70, '...') : '') ?></span></td>
-                <td><?= e($vacancy['hotel_name']) ?><br><span class="muted small"><?= e($vacancy['hotel_city']) ?></span></td>
-                <td><?= e($vacancy['category_name']) ?><br><span class="muted small"><?= e($vacancy['job_role_name']) ?></span></td>
-                <td><?= (int)$vacancy['openings_count'] ?></td>
-                <td>₹<?= e(number_format((float)$vacancy['payout_amount'], 2)) ?><br><span class="muted small"><?= e(ucwords(str_replace('_', ' ', $vacancy['payout_period']))) ?></span></td>
-                <td><span class="status-badge <?= e($vacancy['status']) ?>"><?= e(ucfirst($vacancy['status'])) ?></span></td>
-                <td><?= e(date('d M Y', strtotime($vacancy['created_at']))) ?></td>
-                <td><div class="actions">
-                    <a class="button-small" href="vacancies.php?edit=<?= (int)$vacancy['id'] ?>#vacancy-form">Edit</a>
-                    <?php if ($vacancy['status'] === 'draft' || $vacancy['status'] === 'closed'): ?><form method="post"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="publish"><input type="hidden" name="vacancy_id" value="<?= (int)$vacancy['id'] ?>"><button class="button-small success" type="submit">Publish</button></form><?php endif; ?>
-                    <?php if ($vacancy['status'] === 'published'): ?><form method="post"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="close"><input type="hidden" name="vacancy_id" value="<?= (int)$vacancy['id'] ?>"><button class="button-small danger" type="submit">Close</button></form><?php endif; ?>
-                    <form method="post" onsubmit="return confirm('Remove this vacancy?');"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="vacancy_id" value="<?= (int)$vacancy['id'] ?>"><button class="button-small danger" type="submit">Remove</button></form>
-                </div></td>
-            </tr>
-        <?php endforeach; endif; ?>
-        </tbody></table></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Vacancy</th><th>Hotel</th><th>Category</th><th>Openings</th><th>Payout</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                <?php foreach ($vacancies as $vacancy): ?>
+                    <tr>
+                        <td><strong><?= e($vacancy['title']) ?></strong><div class="muted small"><?= e($vacancy['job_role_name']) ?></div></td>
+                        <td><?= e($vacancy['hotel_name']) ?><div class="muted small"><?= e($vacancy['hotel_city']) ?></div></td>
+                        <td><?= e($vacancy['category_name']) ?></td>
+                        <td><?= (int)$vacancy['openings_count'] ?></td>
+                        <td>₹<?= number_format((float)$vacancy['payout_amount'], 2) ?><div class="muted small"><?= e(str_replace('_', ' ', $vacancy['payout_period'])) ?></div></td>
+                        <td><span class="status-pill status-<?= e($vacancy['status']) ?>"><?= e(ucfirst($vacancy['status'])) ?></span></td>
+                        <td class="actions">
+                            <a class="button-secondary" href="vacancies.php?edit=<?= (int)$vacancy['id'] ?>#vacancy-form">Edit</a>
+                            <?php if ($vacancy['status'] !== 'published'): ?>
+                                <form method="post" style="display:inline"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="publish"><input type="hidden" name="vacancy_id" value="<?= (int)$vacancy['id'] ?>"><button class="button-secondary" type="submit">Publish</button></form>
+                            <?php else: ?>
+                                <form method="post" style="display:inline"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="close"><input type="hidden" name="vacancy_id" value="<?= (int)$vacancy['id'] ?>"><button class="button-secondary" type="submit">Close</button></form>
+                            <?php endif; ?>
+                            <form method="post" style="display:inline" onsubmit="return confirm('Remove this vacancy?');"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="vacancy_id" value="<?= (int)$vacancy['id'] ?>"><button class="button-danger" type="submit">Delete</button></form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (!$vacancies): ?><tr><td colspan="7" class="muted">No vacancies found.</td></tr><?php endif; ?>
+                </tbody>
+            </table>
+        </div>
     </section>
+    <?php endif; ?>
 </main>
 
 <script>
@@ -260,21 +274,17 @@ require __DIR__ . '/includes/sidebar.php';
     const category = document.getElementById('categorySelect');
     const role = document.getElementById('jobRoleSelect');
     if (!category || !role) return;
-    const initialRole = role.value;
-    function filterRoles() {
-        const categoryId = category.value;
-        let selectedVisible = false;
-        Array.from(role.options).forEach(function (option, index) {
+    const syncRoles = () => {
+        const selectedCategory = category.value;
+        Array.from(role.options).forEach((option, index) => {
             if (index === 0) return;
-            const visible = option.dataset.category === categoryId;
-            option.hidden = !visible;
-            if (visible && option.value === initialRole) selectedVisible = true;
+            const matches = option.dataset.category === selectedCategory;
+            option.hidden = !matches;
+            option.disabled = !matches;
         });
-        if (!selectedVisible && role.value !== '') role.value = '';
-    }
-    category.addEventListener('change', function () { role.value = ''; filterRoles(); });
-    filterRoles();
+        if (role.selectedOptions[0] && role.selectedOptions[0].disabled) role.value = '';
+    };
+    category.addEventListener('change', syncRoles);
+    syncRoles();
 })();
 </script>
-
-<?php require __DIR__ . '/includes/footer.php'; ?>
