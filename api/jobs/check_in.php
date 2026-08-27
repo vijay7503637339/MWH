@@ -16,6 +16,30 @@ if ($jobId <= 0) {
     respond(['success' => false, 'message' => 'job_id is required'], 422);
 }
 
+// Check-in must include a fresh hotel-front photo captured by the phone camera.
+// Multipart field name: photo. Gallery is not accepted by the app UI; the backend
+// validates the uploaded file as an image as an additional safety check.
+if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
+    respond(['success' => false, 'message' => 'A hotel front photo is required to check in'], 422);
+}
+
+$photo = $_FILES['photo'];
+$maxPhotoSize = 8 * 1024 * 1024;
+if ((int)$photo['size'] <= 0 || (int)$photo['size'] > $maxPhotoSize) {
+    respond(['success' => false, 'message' => 'Hotel photo must be smaller than 8 MB'], 422);
+}
+
+$finfo = new finfo(FILEINFO_MIME_TYPE);
+$mime = $finfo->file($photo['tmp_name']);
+$allowedMime = [
+    'image/jpeg' => 'jpg',
+    'image/png' => 'png',
+    'image/webp' => 'webp',
+];
+if (!isset($allowedMime[$mime])) {
+    respond(['success' => false, 'message' => 'Only JPG, PNG or WEBP hotel photos are allowed'], 422);
+}
+
 try {
     $pdo->beginTransaction();
 
@@ -43,6 +67,9 @@ try {
         respond(['success' => false, 'message' => 'This job cannot be checked in now'], 409);
     }
 
+    // Check-in remains available for the whole scheduled calendar day.
+    // There is intentionally no start-time cutoff, so a candidate arriving late
+    // can still check in after the scheduled start time.
     $today = gmdate('Y-m-d');
     if (!empty($job['start_date']) && $today < $job['start_date']) {
         $pdo->rollBack();
@@ -74,6 +101,19 @@ try {
         ], 409);
     }
 
+    $uploadDir = dirname(__DIR__) . '/uploads/checkins/' . (int)$user['user_id'];
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+        throw new RuntimeException('Unable to create check-in upload directory');
+    }
+
+    $extension = $allowedMime[$mime];
+    $storedName = 'job_' . $jobId . '_' . bin2hex(random_bytes(12)) . '.' . $extension;
+    $destination = $uploadDir . '/' . $storedName;
+    if (!move_uploaded_file($photo['tmp_name'], $destination)) {
+        throw new RuntimeException('Unable to save hotel photo');
+    }
+    $photoPath = 'uploads/checkins/' . (int)$user['user_id'] . '/' . $storedName;
+
     $latitude = isset($input['latitude']) && $input['latitude'] !== '' ? (float)$input['latitude'] : null;
     $longitude = isset($input['longitude']) && $input['longitude'] !== '' ? (float)$input['longitude'] : null;
 
@@ -81,12 +121,13 @@ try {
         'INSERT INTO attendance_records
             (job_id, user_id, check_in_at, check_in_photo_path, check_in_capture_source,
              check_in_latitude, check_in_longitude, check_in_notes)
-         VALUES (?, ?, UTC_TIMESTAMP(), NULL, ?, ?, ?, ?)'
+         VALUES (?, ?, UTC_TIMESTAMP(), ?, ?, ?, ?, ?)'
     );
     $insert->execute([
         $jobId,
         (int)$user['user_id'],
-        'mobile',
+        $photoPath,
+        'camera',
         $latitude,
         $longitude,
         isset($input['notes']) ? trim((string)$input['notes']) : null,
@@ -98,7 +139,7 @@ try {
 
     $pdo->commit();
 
-    $timeStmt = $pdo->prepare('SELECT check_in_at FROM attendance_records WHERE id = ? LIMIT 1');
+    $timeStmt = $pdo->prepare('SELECT check_in_at, check_in_photo_path FROM attendance_records WHERE id = ? LIMIT 1');
     $timeStmt->execute([$attendanceId]);
     $attendance = $timeStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -110,6 +151,7 @@ try {
             'attendance_id' => $attendanceId,
             'status' => 'checked_in',
             'checked_in_at' => $attendance['check_in_at'] ?? null,
+            'check_in_photo_path' => $attendance['check_in_photo_path'] ?? $photoPath,
             'hotel' => [
                 'id' => (int)$job['hotel_id'],
                 'name' => $job['hotel_name'],
@@ -118,5 +160,6 @@ try {
     ]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
+    if (isset($destination) && is_file($destination)) @unlink($destination);
     respond(['success' => false, 'message' => 'Could not check in'], 500);
 }
