@@ -36,7 +36,17 @@ try {
         exit;
     }
 
-    $accountStatus = strtolower((string)$user['account_status']);
+    $accountStatus = strtolower(trim((string)$user['account_status']));
+
+    if ($accountStatus === 'pending_verification') {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Your account is pending admin verification. You can login after your account has been verified.'
+        ]);
+        exit;
+    }
+
     if (in_array($accountStatus, ['blocked', 'rejected'], true)) {
         http_response_code(403);
         echo json_encode([
