@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../api/config/database.php';
+require_once __DIR__ . '/../api/services/fcm.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: jobs.php');
@@ -83,6 +84,25 @@ try {
 
     $pdo->prepare("UPDATE jobs SET status='paid', updated_at=CURRENT_TIMESTAMP WHERE id=?")->execute([$jobId]);
 
+    $notificationTitle = 'Payment Received';
+    $notificationMessage = 'Payment of ₹' . number_format($amount, 2) . ' has been received for your job.';
+    $notification = $pdo->prepare(
+        'INSERT INTO notifications (user_id,admin_user_id,type,title,message,data_json) VALUES (?,?,?,?,?,?)'
+    );
+    $notification->execute([
+        (int)$job['user_id'],
+        (int)$admin['id'],
+        'payment',
+        $notificationTitle,
+        $notificationMessage,
+        json_encode([
+            'payment_id' => $paymentId,
+            'job_id' => $jobId,
+            'amount' => number_format($amount, 2, '.', ''),
+            'transaction_reference' => $reference,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+    ]);
+
     $audit = $pdo->prepare('INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,old_values,new_values,ip_address,user_agent) VALUES(?,?,?,?,?,?,?,?,?)');
     $audit->execute([
         'admin',
@@ -97,7 +117,30 @@ try {
     ]);
 
     $pdo->commit();
+
+    $push = ['sent'=>0,'failed'=>0,'removed'=>0,'devices'=>0];
+    try {
+        $push = sendFcmToUsers(
+            $pdo,
+            [(int)$job['user_id']],
+            $notificationTitle,
+            $notificationMessage,
+            'payment',
+            [
+                'payment_id' => $paymentId,
+                'job_id' => $jobId,
+                'amount' => number_format($amount, 2, '.', ''),
+                'transaction_reference' => $reference,
+            ]
+        );
+    } catch (Throwable $pushError) {
+        error_log('MWH payment push failed: ' . $pushError->getMessage());
+    }
+
     $_SESSION['jobs_success'] = 'Payment of ₹' . number_format($amount, 2) . ' recorded successfully. Job marked as Paid.';
+    if ($push['sent'] > 0) {
+        $_SESSION['jobs_success'] .= ' Payment notification sent.';
+    }
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
