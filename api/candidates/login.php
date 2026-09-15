@@ -12,12 +12,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $input = json_decode(file_get_contents('php://input'), true);
-$email = strtolower(trim((string)($input['email'] ?? '')));
+$mobile = preg_replace('/\D+/', '', (string)($input['mobile'] ?? ''));
 $password = (string)($input['password'] ?? '');
 
-if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+if ($mobile === '' || !preg_match('/^[6-9]\d{9}$/', $mobile)) {
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'A valid email address is required']);
+    echo json_encode(['success' => false, 'message' => 'A valid 10-digit mobile number is required']);
     exit;
 }
 
@@ -33,35 +33,27 @@ try {
                 cp.first_name, cp.last_name
          FROM users u
          LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
-         WHERE LOWER(u.email) = LOWER(?) AND u.deleted_at IS NULL
+         WHERE u.mobile = ? AND u.deleted_at IS NULL
          LIMIT 1'
     );
-    $stmt->execute([$email]);
+    $stmt->execute([$mobile]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user || empty($user['password_hash']) || !password_verify($password, $user['password_hash'])) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
+        echo json_encode(['success' => false, 'message' => 'Invalid mobile number or password']);
         exit;
     }
 
     $accountStatus = strtolower(trim((string)$user['account_status']));
-
     if ($accountStatus === 'pending_verification') {
         http_response_code(403);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Your account is pending admin verification. You can login after your account has been verified.'
-        ]);
+        echo json_encode(['success' => false, 'message' => 'Your account is pending admin verification. You can login after your account has been verified.']);
         exit;
     }
-
     if (in_array($accountStatus, ['blocked', 'rejected'], true)) {
         http_response_code(403);
-        echo json_encode([
-            'success' => false,
-            'message' => $accountStatus === 'blocked' ? 'Account is blocked' : 'Account is rejected'
-        ]);
+        echo json_encode(['success' => false, 'message' => $accountStatus === 'blocked' ? 'Account is blocked' : 'Account is rejected']);
         exit;
     }
 
@@ -70,36 +62,15 @@ try {
     $expiresAt = date('Y-m-d H:i:s', time() + 60 * 60 * 24 * 30);
 
     $pdo->beginTransaction();
-    $pdo->prepare(
-        'UPDATE api_tokens
-         SET revoked_at = CURRENT_TIMESTAMP
-         WHERE user_id = ? AND revoked_at IS NULL'
-    )->execute([$user['id']]);
-
-    $pdo->prepare(
-        'INSERT INTO api_tokens (user_id, token_hash, expires_at)
-         VALUES (?, ?, ?)'
-    )->execute([$user['id'], $tokenHash, $expiresAt]);
-
+    $pdo->prepare('UPDATE api_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL')->execute([$user['id']]);
+    $pdo->prepare('INSERT INTO api_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)')->execute([$user['id'], $tokenHash, $expiresAt]);
     $pdo->prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$user['id']]);
     $pdo->commit();
 
     unset($user['password_hash']);
-
-    echo json_encode([
-        'success' => true,
-        'message' => 'Login successful',
-        'data' => [
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'expires_at' => $expiresAt,
-            'user' => $user
-        ]
-    ]);
+    echo json_encode(['success' => true, 'message' => 'Login successful', 'data' => ['token' => $token, 'token_type' => 'Bearer', 'expires_at' => $expiresAt, 'user' => $user]]);
 } catch (Throwable $e) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log($e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Login failed']);
