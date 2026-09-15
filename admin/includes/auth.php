@@ -38,9 +38,8 @@ function registerAutomaticVacancyNotification(): void
             $action = (string)($_POST['action'] ?? '');
             $vacancyId = (int)($_POST['vacancy_id'] ?? 0);
             $adminId = (int)($_SESSION['admin_id'] ?? 0);
-            $success = (string)($_SESSION['vacancy_success'] ?? '');
 
-            if ($adminId <= 0 || $success === '') {
+            if ($adminId <= 0) {
                 return;
             }
 
@@ -65,6 +64,7 @@ function registerAutomaticVacancyNotification(): void
                      FROM vacancies v
                      INNER JOIN hotels h ON h.id=v.hotel_id
                      WHERE v.id=? AND v.status='published' AND v.deleted_at IS NULL
+                       AND v.published_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
                      LIMIT 1"
                 );
                 $vacancyStmt->execute([$vacancyId]);
@@ -75,6 +75,7 @@ function registerAutomaticVacancyNotification(): void
                      FROM vacancies v
                      INNER JOIN hotels h ON h.id=v.hotel_id
                      WHERE v.created_by_admin_id=? AND v.title=? AND v.status='published' AND v.deleted_at IS NULL
+                       AND v.published_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
                      ORDER BY v.id DESC
                      LIMIT 1"
                 );
