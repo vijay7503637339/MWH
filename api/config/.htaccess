@@ -1,0 +1,9 @@
+<FilesMatch "^firebase-service-account.*\.json$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "^firebase-service-account.*\.json$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
