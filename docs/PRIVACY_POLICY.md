@@ -10,6 +10,20 @@ Sensitive documents and payment information must be protected by appropriate tec
 
 The application may use notifications and other service communications to provide account, job, attendance, payment and support updates.
 
-For privacy questions or data requests, contact the support details configured by Maan World Hospitality.
+## Account and data deletion
+
+Users can permanently delete their Maan World Hospitality account from the **Account → Settings & Support → Delete Account** screen inside the mobile application. The in-app deletion flow calls the authenticated account-deletion API and clears the local session after successful deletion.
+
+Users who no longer have access to the mobile application can request account deletion through the public account-deletion web resource:
+
+**https://webstripetechnologies.com/MWH/api/account/delete.php**
+
+When an account is deleted, the service is designed to remove the candidate's account record and associated profile/contact information, professional details, job preferences, uploaded candidate documents/profile photo, applications, jobs, attendance records, payment profile/payment records, notifications, referrals, support tickets and API authentication tokens. Uploaded candidate files are also removed from the application's storage where available.
+
+Certain information may be retained only where required or permitted for legitimate security, fraud-prevention, regulatory, tax, accounting or legal purposes. Any such retention must be documented in the final production privacy policy and Data safety disclosures.
+
+Deletion requests should be completed within a reasonably quick period, subject to identity verification and any legally required retention.
+
+For privacy questions or data requests, contact the support details configured by Maan World Hospitality / WebStripe Technologies.
 
 This draft must be reviewed and approved by the client and appropriate legal counsel, including applicable retention, deletion, consent, international transfer and grievance requirements, before production release.
