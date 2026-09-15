@@ -28,6 +28,10 @@
 *.key
 *.p12
 
+# Firebase service-account credentials — NEVER commit these
+**/firebase-service-account.json
+**/firebase-service-account*.json
+
 # Logs / temp
 *.log
 *.tmp
