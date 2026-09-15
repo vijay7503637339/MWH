@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../api/config/database.php';
+require_once __DIR__ . '/../api/services/fcm.php';
 
 $pageTitle = 'Assign Job';
 if (empty($_SESSION['assign_job_csrf'])) {
@@ -94,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $admin = currentAdmin();
+        $isNewAssignment = $job === null;
         $pdo->beginTransaction();
 
         if ($job) {
@@ -173,18 +175,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SERVER['HTTP_USER_AGENT'] ?? null,
         ]);
 
+        $notificationTitle = 'Job Assigned';
+        $notificationMessage = 'You have been assigned to ' . $application['vacancy_title'] . ' at ' . $application['hotel_name'] . ' on ' . $startDate . '.';
         $notification = $pdo->prepare(
-            'INSERT INTO notifications (user_id, type, title, message, data_json) VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO notifications (user_id, admin_user_id, type, title, message, data_json) VALUES (?, ?, ?, ?, ?, ?)'
         );
         $notification->execute([
             (int)$application['user_id'],
-            'job_assigned',
-            'Job assigned',
-            'You have been assigned to ' . $application['vacancy_title'] . ' at ' . $application['hotel_name'] . ' on ' . $startDate . '.',
-            json_encode(['job_id' => $jobId, 'application_id' => $applicationId]),
+            (int)$admin['id'],
+            'job',
+            $notificationTitle,
+            $notificationMessage,
+            json_encode(['job_id' => $jobId, 'application_id' => $applicationId], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ]);
 
         $pdo->commit();
+
+        if ($isNewAssignment) {
+            try {
+                sendFcmToUsers(
+                    $pdo,
+                    [(int)$application['user_id']],
+                    $notificationTitle,
+                    $notificationMessage,
+                    'job',
+                    ['job_id' => $jobId, 'application_id' => $applicationId]
+                );
+            } catch (Throwable $pushError) {
+                error_log('MWH job assignment push failed: ' . $pushError->getMessage());
+            }
+        }
+
         $success = $job ? 'Job schedule updated successfully.' : 'Job assigned successfully.';
 
         $jobStmt->execute([$applicationId]);
