@@ -64,6 +64,26 @@ GET /payments/{paymentId}
 
 Payment creation is an admin operation and will be defined under the protected admin API surface.
 
+## Notifications
+
+```text
+GET  /notifications/list.php
+POST /notifications/list.php
+POST /notifications/register_token.php
+```
+
+`POST /notifications/register_token.php` requires the candidate Bearer token and accepts:
+
+```json
+{
+  "token": "<FCM device token>",
+  "platform": "android",
+  "language": "en"
+}
+```
+
+The backend upserts the FCM device token for the authenticated candidate. The admin notification screen persists the in-app notification and sends the same title/body through Firebase Cloud Messaging to all registered devices for the selected candidate(s).
+
 ## Support
 
 ```text
@@ -115,3 +135,4 @@ Error responses must not expose stack traces, SQL errors, secrets or sensitive p
 - Use stable IDs and documented status values.
 - Do not return sensitive fields unless the endpoint explicitly requires them.
 - Document upload endpoints must enforce file validation and access control.
+- Firebase service-account credentials must never be committed to the repository.
