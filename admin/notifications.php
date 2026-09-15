@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../api/config/database.php';
+require_once __DIR__ . '/../api/services/fcm.php';
 
 $pageTitle = 'Notifications';
 $admin = currentAdmin();
@@ -21,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(419); exit('Invalid request token.');
     }
 
+    $transactionStarted = false;
     try {
         $recipient = trim((string)($_POST['recipient'] ?? ''));
         $type = trim((string)($_POST['type'] ?? 'general'));
@@ -47,23 +49,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt = $pdo->prepare('INSERT INTO notifications(user_id,admin_user_id,type,title,message,data_json) VALUES(?,?,?,?,?,?)');
         $pdo->beginTransaction();
+        $transactionStarted = true;
         foreach ($users as $userId) {
             $stmt->execute([(int)$userId, (int)$admin['id'], $type, $title, $message, null]);
         }
         $pdo->commit();
+        $transactionStarted = false;
 
         $count = count($users);
+        $push = sendFcmToUsers($pdo, $users, $title, $message, $type);
+
         $audit = $pdo->prepare('INSERT INTO audit_logs(admin_user_id,action,entity_type,entity_id,new_values,ip_address,user_agent) VALUES(?,?,?,?,?,?,?)');
         $audit->execute([
             (int)$admin['id'], 'notification.sent', 'notification', null,
-            json_encode(['recipient'=>$recipient,'recipient_count'=>$count,'type'=>$type,'title'=>$title], JSON_UNESCAPED_UNICODE),
+            json_encode([
+                'recipient'=>$recipient,
+                'recipient_count'=>$count,
+                'type'=>$type,
+                'title'=>$title,
+                'push_devices'=>$push['devices'],
+                'push_sent'=>$push['sent'],
+                'push_failed'=>$push['failed'],
+                'push_removed'=>$push['removed'],
+            ], JSON_UNESCAPED_UNICODE),
             $_SERVER['REMOTE_ADDR'] ?? null, $_SERVER['HTTP_USER_AGENT'] ?? null,
         ]);
 
-        $_SESSION['notifications_success'] = "Notification sent to {$count} candidate" . ($count === 1 ? '' : 's') . '.';
+        $_SESSION['notifications_success'] = "Notification saved for {$count} candidate" . ($count === 1 ? '' : 's') . ". Push sent to {$push['sent']} device" . ($push['sent'] === 1 ? '' : 's') . ".";
+        if ($push['devices'] === 0) {
+            $_SESSION['notifications_success'] .= ' No registered app device was found.';
+        } elseif ($push['failed'] > 0) {
+            $_SESSION['notifications_success'] .= " {$push['failed']} push device" . ($push['failed'] === 1 ? '' : 's') . ' failed.';
+        }
         redirectNotifications();
     } catch (Throwable $ex) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($transactionStarted && $pdo->inTransaction()) $pdo->rollBack();
         $errors[] = $ex->getMessage();
     }
 }
@@ -75,7 +95,7 @@ require __DIR__ . '/includes/header.php';
 require __DIR__ . '/includes/sidebar.php';
 ?>
 <style>
-.notification-page{max-width:1450px;margin:0 auto}.notification-heading{margin-bottom:22px}.notification-heading .page-kicker{display:flex;align-items:center;gap:8px;color:#4169e1;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}.notification-heading h1{font-size:32px;margin-bottom:6px}.notification-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(380px,.9fr);gap:18px}.notification-card{background:#fff;border:1px solid #e7ebf2;border-radius:16px;box-shadow:0 4px 14px rgba(20,35,60,.04);padding:22px}.notification-card h2{font-size:18px;margin:0 0 5px;color:#172033}.notification-card .sub{margin:0 0 18px;color:#7a8498;font-size:12px}.notification-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.notification-form-group.full{grid-column:1/-1}.notification-form-group label{display:block;margin-bottom:6px;font-size:11px;font-weight:750;color:#526078}.notification-form-group input,.notification-form-group select,.notification-form-group textarea{width:100%;box-sizing:border-box;border:1px solid #dfe5ee;border-radius:10px;padding:11px 12px;background:#fbfcfe;font:inherit;font-size:12px;color:#273247}.notification-form-group textarea{min-height:150px;resize:vertical}.notification-form-actions{display:flex;justify-content:flex-end;margin-top:18px}.notification-send{height:42px;border:0;border-radius:10px;background:#4169e1;color:#fff;padding:0 18px;font-weight:750;font-size:12px;cursor:pointer}.notification-alert{border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:12px}.notification-alert.success{background:#edf9f3;color:#087b50;border:1px solid #c7eddc}.notification-alert.error{background:#fff4f4;color:#b52d35;border:1px solid #f1d0d3}.notification-recent{padding:0;overflow:hidden}.notification-recent-head{padding:20px 22px;border-bottom:1px solid #edf0f5}.notification-list{max-height:650px;overflow:auto}.notification-row{padding:14px 22px;border-bottom:1px solid #eef1f5}.notification-row:last-child{border-bottom:0}.notification-row-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.notification-row strong{font-size:13px;color:#1c2739}.notification-type{display:inline-flex;padding:5px 8px;border-radius:999px;background:#eef3ff;color:#4169e1;font-size:9px;font-weight:800;text-transform:uppercase}.notification-row p{margin:5px 0 0;color:#66738a;font-size:11px;line-height:1.45}.notification-row-meta{margin-top:7px;color:#9aa3b2;font-size:10px}.notification-empty{padding:45px 20px;text-align:center;color:#8b95a7;font-size:12px}.notification-tip{margin-top:12px;padding:10px 12px;background:#f6f8fc;border-radius:10px;color:#7a8498;font-size:10px;line-height:1.5}@media(max-width:980px){.notification-layout{grid-template-columns:1fr}}@media(max-width:600px){.notification-form-grid{grid-template-columns:1fr}.notification-form-group.full{grid-column:auto}.notification-card{padding:17px}.notification-heading h1{font-size:27px}}
+.notification-page{max-width:1450px;margin:0 auto}.notification-heading{margin-bottom:22px}.notification-heading .page-kicker{display:flex;align-items:center;gap:8px;color:#4169e1;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}.notification-heading h1{font-size:32px;margin-bottom:6px}.notification-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(380px,.9fr);gap:18px}.notification-card{background:#fff;border:1px solid #e7ebf2;border-radius:16px;box-shadow:0 4px 14px rgba(20,35,60,.04);padding:22px}.notification-card h2{font-size:18px;margin:0 0 5px;color:#172033}.notification-card .sub{margin:0 0 18px;color:#7a8498;font-size:12px}.notification-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.notification-form-group.full{grid-column:1/-1}.notification-form-group label{display:block;margin-bottom:6px;font-size:11px;font-weight:750;color:#526078}.notification-form-group input,.notification-form-group select,.notification-form-group textarea{width:100%;box-sizing:border-box;border:1px solid #dfe5ee;border-radius:10px;padding:11px 12px;background:#fbfcfe;font:inherit;font-size:12px;color:#273247}.notification-form-group textarea{min-height:150px;resize:vertical}.notification-form-actions{display:flex;justify-content:flex-end;margin-top:18px}.notification-send{height:42px;border:0;border-radius:10px;background:#4169e1;color:#fff;padding:0 18px;font-weight:750;font-size:12px;cursor:pointer}.notification-alert{border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:12px}.notification-alert.success{background:#edf9f3;color:#087b50;border:1px solid #c7eddc}.notification-alert.error{background:#fff4f4;color:#b52d35;border:1px solid #f1d0d3}.notification-recent{padding:0;overflow:hidden}.notification-recent-head{padding:20px 22px;border-bottom:1px solid #edf0f5}.notification-list{max-height:650px;overflow:auto}.notification-row{padding:14px 22px;border-bottom:1px solid #eef1f5}.notification-row:last-child{border-bottom:0}.notification-row-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.notification-row strong{font-size:13px;color:#1c2739}.notification-type{display:inline-flex;padding:5px 8px;border-radius:999px;background:#eef3ff;color:#4169e1;font-size:9px;font-weight:800;text-transform:uppercase}.notification-row p{margin:5px 0 0;color:#66738a;font-size:11px;line-height:1.45}.notification-row-meta{margin-top:7px;color:#9aa3b2;font-size:10px}.notification-empty{padding:45px 20px;text-align:center;color:#8b95a7;font-size:12px}.notification-tip{margin-top:12px;padding:10px 12px;background:#f6f8fc;border-radius:10px;color:#7a8498;font-size:10px;line-height:1.5}.notification-tip strong{color:#526078}@media(max-width:980px){.notification-layout{grid-template-columns:1fr}}@media(max-width:600px){.notification-form-grid{grid-template-columns:1fr}.notification-form-group.full{grid-column:auto}.notification-card{padding:17px}.notification-heading h1{font-size:27px}}
 </style>
 
 <main class="content notification-page">
@@ -125,7 +145,7 @@ require __DIR__ . '/includes/sidebar.php';
                         <textarea id="message" name="message" maxlength="5000" placeholder="Write the notification message..." required></textarea>
                     </div>
                 </div>
-                <div class="notification-tip"><i class="bi bi-info-circle me-1"></i> Notifications are stored in the candidate's notification inbox. This screen does not send SMS or push notifications.</div>
+                <div class="notification-tip"><i class="bi bi-info-circle me-1"></i> The notification is saved in the candidate inbox and sent through Firebase Cloud Messaging to registered app devices.</div>
                 <div class="notification-form-actions"><button class="notification-send" type="submit"><i class="bi bi-send-fill me-1"></i> Send Notification</button></div>
             </form>
         </section>
