@@ -12,27 +12,36 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $input = json_decode(file_get_contents('php://input'), true);
-$mobile = trim((string)($input['mobile'] ?? ''));
+$email = strtolower(trim((string)($input['email'] ?? '')));
+$password = (string)($input['password'] ?? '');
 
-if ($mobile === '') {
+if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Mobile number is required']);
+    echo json_encode(['success' => false, 'message' => 'A valid email address is required']);
+    exit;
+}
+
+if ($password === '') {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Password is required']);
     exit;
 }
 
 try {
     $stmt = $pdo->prepare(
-        'SELECT id, email, mobile, account_status
-         FROM users
-         WHERE mobile = ? AND deleted_at IS NULL
+        'SELECT u.id, u.email, u.mobile, u.password_hash, u.account_status,
+                cp.first_name, cp.last_name
+         FROM users u
+         LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
+         WHERE LOWER(u.email) = LOWER(?) AND u.deleted_at IS NULL
          LIMIT 1'
     );
-    $stmt->execute([$mobile]);
-    $user = $stmt->fetch();
+    $stmt->execute([$email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user) {
-        http_response_code(404);
-        echo json_encode(['success' => false, 'message' => 'User not registered']);
+    if (!$user || empty($user['password_hash']) || !password_verify($password, $user['password_hash'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Invalid email or password']);
         exit;
     }
 
@@ -72,7 +81,10 @@ try {
          VALUES (?, ?, ?)'
     )->execute([$user['id'], $tokenHash, $expiresAt]);
 
+    $pdo->prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$user['id']]);
     $pdo->commit();
+
+    unset($user['password_hash']);
 
     echo json_encode([
         'success' => true,
@@ -88,6 +100,7 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
+    error_log($e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Login failed']);
 }
