@@ -51,16 +51,16 @@ function notifyVerifiedCandidatesForVacancy(PDO $pdo, int $vacancyId, int $admin
         }
 
         $message = 'New hospitality job available: ' . $vacancy['title'] . ' at ' . $vacancy['hotel_name'] . '.';
+        $exists = $pdo->prepare(
+            "SELECT id FROM notifications
+             WHERE user_id = ?
+               AND type = 'vacancy'
+               AND JSON_UNQUOTE(JSON_EXTRACT(data_json, '$.vacancy_id')) = ?
+             LIMIT 1"
+        );
         $insert = $pdo->prepare(
-            "INSERT INTO notifications (user_id, admin_user_id, type, title, message, data_json)
-             SELECT ?, ?, 'vacancy', ?, ?, ?
-             WHERE NOT EXISTS (
-                 SELECT 1 FROM notifications
-                 WHERE user_id = ?
-                   AND type = 'vacancy'
-                   AND JSON_UNQUOTE(JSON_EXTRACT(data_json, '$.vacancy_id')) = ?
-                 LIMIT 1
-             )"
+            'INSERT INTO notifications (user_id, admin_user_id, type, title, message, data_json)
+             VALUES (?, ?, ?, ?, ?, ?)'
         );
 
         $newUserIds = [];
@@ -72,14 +72,18 @@ function notifyVerifiedCandidatesForVacancy(PDO $pdo, int $vacancyId, int $admin
         $pdo->beginTransaction();
         foreach ($candidates as $candidateId) {
             $candidateId = (int)$candidateId;
+            $exists->execute([$candidateId, (string)$vacancy['id']]);
+            if ($exists->fetchColumn()) {
+                continue;
+            }
+
             $insert->execute([
                 $candidateId,
                 $adminUserId,
+                'vacancy',
                 'New Job Available',
                 $message,
                 $dataJson,
-                $candidateId,
-                (string)$vacancy['id'],
             ]);
             if ($insert->rowCount() === 1) {
                 $newUserIds[] = $candidateId;
