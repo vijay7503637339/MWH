@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../api/config/database.php';
+require_once __DIR__ . '/../api/services/notification_dispatcher.php';
 
 $pageTitle = 'Vacancies';
 $admin = currentAdmin();
@@ -57,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $responsibilities = trim((string)($_POST['responsibilities'] ?? ''));
             $dressCode = trim((string)($_POST['dress_code'] ?? ''));
             $status = (string)($_POST['status'] ?? 'draft');
+            $shouldNotifyPublished = false;
 
             if ($hotelId <= 0) throw new RuntimeException('Please select a hotel.');
             if ($categoryId <= 0) throw new RuntimeException('Please select a category.');
@@ -79,11 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $publishedAt = $status === 'published' ? date('Y-m-d H:i:s') : null;
 
             if ($vacancyId > 0) {
-                $check = $pdo->prepare('SELECT id, published_at FROM vacancies WHERE id=? AND deleted_at IS NULL LIMIT 1');
+                $check = $pdo->prepare('SELECT id, status, published_at FROM vacancies WHERE id=? AND deleted_at IS NULL LIMIT 1');
                 $check->execute([$vacancyId]);
                 $existing = $check->fetch(PDO::FETCH_ASSOC);
                 if (!$existing) throw new RuntimeException('Vacancy not found.');
 
+                $wasPublished = (string)$existing['status'] === 'published';
                 if ($status === 'published') {
                     $publishedAt = date('Y-m-d H:i:s');
                 } elseif ($status !== 'published') {
@@ -92,22 +95,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $pdo->prepare('UPDATE vacancies SET hotel_id=?, category_id=?, job_role_id=?, title=?, description=?, openings_count=?, payout_amount=?, payout_period=?, working_hours=?, requirements=?, responsibilities=?, dress_code=?, status=?, published_at=? WHERE id=?');
                 $stmt->execute([$hotelId, $categoryId, $jobRoleId, $title, $description !== '' ? $description : null, $openings, number_format((float)$payoutAmount, 2, '.', ''), $payoutPeriod, $workingHours !== '' ? $workingHours : null, $requirements !== '' ? $requirements : null, $responsibilities !== '' ? $responsibilities : null, $dressCode !== '' ? $dressCode : null, $status, $publishedAt, $vacancyId]);
+                $shouldNotifyPublished = $status === 'published' && !$wasPublished;
                 $_SESSION['vacancy_success'] = 'Vacancy updated successfully.';
             } else {
                 $stmt = $pdo->prepare('INSERT INTO vacancies (hotel_id, category_id, job_role_id, title, description, openings_count, payout_amount, payout_period, working_hours, requirements, responsibilities, dress_code, status, published_at, created_by_admin_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
                 $stmt->execute([$hotelId, $categoryId, $jobRoleId, $title, $description !== '' ? $description : null, $openings, number_format((float)$payoutAmount, 2, '.', ''), $payoutPeriod, $workingHours !== '' ? $workingHours : null, $requirements !== '' ? $requirements : null, $responsibilities !== '' ? $responsibilities : null, $dressCode !== '' ? $dressCode : null, $status, $publishedAt, $admin['id']]);
+                $vacancyId = (int)$pdo->lastInsertId();
+                $shouldNotifyPublished = $status === 'published';
                 $_SESSION['vacancy_success'] = 'Vacancy added successfully.';
+            }
+
+            if ($shouldNotifyPublished && $vacancyId > 0) {
+                try {
+                    $dispatch = notifyVerifiedCandidatesForVacancy($pdo, $vacancyId, (int)$admin['id']);
+                    if (($dispatch['push_sent'] ?? 0) > 0) {
+                        $_SESSION['vacancy_success'] .= ' Notification sent to verified candidates.';
+                    }
+                } catch (Throwable $pushError) {
+                    error_log('MWH vacancy notification dispatch failed: ' . $pushError->getMessage());
+                }
             }
             redirectVacancies();
         }
 
         if ($action === 'publish' && $vacancyId > 0) {
+            $check = $pdo->prepare("SELECT status FROM vacancies WHERE id=? AND deleted_at IS NULL LIMIT 1");
+            $check->execute([$vacancyId]);
+            $existingStatus = $check->fetchColumn();
+            if ($existingStatus === false) throw new RuntimeException('Vacancy not found.');
+            $shouldNotifyPublished = (string)$existingStatus !== 'published';
+
             // Re-publishing a closed vacancy must reset published_at to NOW().
             // Otherwise Apply API can reject it as "not open yet" when the old
             // published_at value is in the future relative to the current time.
             $stmt = $pdo->prepare("UPDATE vacancies SET status='published', published_at=NOW(), closing_at=NULL WHERE id=? AND deleted_at IS NULL");
             $stmt->execute([$vacancyId]);
             $_SESSION['vacancy_success'] = 'Vacancy published successfully.';
+
+            if ($shouldNotifyPublished) {
+                try {
+                    $dispatch = notifyVerifiedCandidatesForVacancy($pdo, $vacancyId, (int)$admin['id']);
+                    if (($dispatch['push_sent'] ?? 0) > 0) {
+                        $_SESSION['vacancy_success'] .= ' Notification sent to verified candidates.';
+                    }
+                } catch (Throwable $pushError) {
+                    error_log('MWH vacancy notification dispatch failed: ' . $pushError->getMessage());
+                }
+            }
             redirectVacancies();
         }
 
