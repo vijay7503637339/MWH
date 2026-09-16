@@ -26,9 +26,6 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <a class="<?= $currentPage === 'candidates.php' ? 'active' : '' ?>" href="candidates.php">
             <span class="nav-icon"><i class="bi bi-people-fill"></i></span><span>Candidates</span>
         </a>
-        <a class="<?= $currentPage === 'availability.php' ? 'active' : '' ?>" href="availability.php">
-            <span class="nav-icon"><i class="bi bi-person-check-fill"></i></span><span>Candidate Availability</span>
-        </a>
         <a class="<?= $currentPage === 'applications.php' ? 'active' : '' ?>" href="applications.php">
             <span class="nav-icon"><i class="bi bi-file-earmark-check-fill"></i></span><span>Applications</span>
         </a>
