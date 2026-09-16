@@ -56,3 +56,48 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         </a>
     </div>
 </aside>
+
+<?php if ($currentPage === 'candidates.php'): ?>
+<style>
+.candidate-availability-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:800}
+.candidate-availability-badge.available{background:#effcf6;color:#087b50}
+.candidate-availability-badge.unavailable{background:#fff1f2;color:#c9363d}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const table = document.querySelector('.data-table');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('thead th');
+    let availabilityIndex = -1;
+    headers.forEach(function (header, index) {
+        if (header.textContent.trim().toLowerCase() === 'documents') {
+            availabilityIndex = index;
+            header.textContent = 'Availability';
+        }
+    });
+    if (availabilityIndex === -1) return;
+
+    fetch('candidate_availability_data.php', {credentials: 'same-origin', cache: 'no-store'})
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (payload) {
+            if (!payload || !payload.success || !payload.availability) return;
+
+            table.querySelectorAll('tbody tr').forEach(function (row) {
+                const viewLink = row.querySelector('a[href*="candidates.php?view="]');
+                if (!viewLink) return;
+
+                const match = viewLink.getAttribute('href').match(/[?&]view=(\d+)/);
+                if (!match) return;
+
+                const status = payload.availability[match[1]] || 'available';
+                const cell = row.cells[availabilityIndex];
+                if (!cell) return;
+
+                cell.innerHTML = '<span class="candidate-availability-badge ' + status + '"><i class="bi ' + (status === 'available' ? 'bi-check-circle-fill' : 'bi-x-circle-fill') + '"></i> ' + (status === 'available' ? 'Available' : 'Unavailable') + '</span>';
+            });
+        })
+        .catch(function () {});
+});
+</script>
+<?php endif; ?>
