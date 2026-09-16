@@ -118,7 +118,7 @@ declare(strict_types=1);
         <h3>From the MWH app</h3>
         <p>Use the account/settings area and the available account deletion option to submit the deletion request.</p>
         <h3>From the web</h3>
-        <p>If you no longer have access to the app, you can request deletion by emailing <a href="mailto:info@webstripetechnologies.com?subject=MWH%20Account%20and%20Data%20Deletion%20Request">info@webstripetechnologies.com</a> with the subject <strong>MWH Account and Data Deletion Request</strong>. Include the mobile number or email address associated with your MWH account so that we can verify account ownership before processing the request.</p>
+        <p>Use our <a href="/MWH/delete-account.php">MWH Account Deletion Request page</a> to submit your request. You can also email <a href="mailto:info@webstripetechnologies.com?subject=MWH%20Account%20and%20Data%20Deletion%20Request">info@webstripetechnologies.com</a> with the subject <strong>MWH Account and Data Deletion Request</strong>. Include the mobile number or email address associated with your MWH account so that we can verify account ownership before processing the request.</p>
         <p>Once ownership is verified, we will process the deletion request and delete the associated account data as described in this policy, subject to any limited retention required for legitimate legal, security or regulatory reasons.</p>
     </section>
 
