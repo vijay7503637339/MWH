@@ -41,6 +41,9 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <a class="<?= $currentPage === 'notifications.php' ? 'active' : '' ?>" href="notifications.php">
             <span class="nav-icon"><i class="bi bi-bell-fill"></i></span><span>Notifications</span>
         </a>
+        <a class="<?= $currentPage === 'account_deletion_requests.php' ? 'active' : '' ?>" href="account_deletion_requests.php">
+            <span class="nav-icon"><i class="bi bi-person-x-fill"></i></span><span>Account Deletion</span>
+        </a>
     </nav>
 
     <div class="sidebar-bottom">
