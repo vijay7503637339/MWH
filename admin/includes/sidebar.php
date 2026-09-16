@@ -65,7 +65,12 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const table = document.querySelector('.data-table');
+    const tables = Array.from(document.querySelectorAll('.data-table'));
+    const table = tables.find(function (candidateTable) {
+        return Array.from(candidateTable.querySelectorAll('thead th')).some(function (header) {
+            return header.textContent.trim().toLowerCase() === 'documents';
+        });
+    });
     if (!table) return;
 
     const headers = table.querySelectorAll('thead th');
