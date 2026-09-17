@@ -21,6 +21,15 @@ $pageTitle = $pageTitle ?? 'MWH Admin';
     <link rel="stylesheet" href="assets/layout-fix.css">
     <link rel="stylesheet" href="assets/module-theme.css?v=2">
     <link rel="stylesheet" href="assets/responsive-admin.css?v=1">
+    <style>
+        .mwh-topbar-actions{display:flex;align-items:center;gap:12px}
+        .mwh-account-actions{display:flex;align-items:center;gap:8px}
+        .mwh-account-action{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid #e1e7f0;border-radius:10px;background:#fff;color:#34435c;text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap;transition:background .18s,border-color .18s,transform .18s}
+        .mwh-account-action:hover{background:#f5f8ff;border-color:#cbd7ef;color:#244fbd;transform:translateY(-1px)}
+        .mwh-account-action.logout{color:#b4232d;border-color:#f1d5d7}
+        .mwh-account-action.logout:hover{background:#fff4f4;border-color:#e9b9bd;color:#a31c25}
+        @media(max-width:700px){.mwh-topbar-actions{gap:6px}.mwh-topbar-user-copy{display:none}.mwh-account-action{padding:9px 10px;font-size:12px}.mwh-account-action span{display:none}.mwh-account-action i{font-size:16px}}
+    </style>
 </head>
 <body class="admin-page">
 <div class="app-shell">
@@ -39,6 +48,14 @@ $pageTitle = $pageTitle ?? 'MWH Admin';
                 <span><?= htmlspecialchars($admin['role']) ?></span>
             </div>
         </div>
+        <nav class="mwh-account-actions" aria-label="Account actions">
+            <a class="mwh-account-action" href="change_password.php" title="Change Password">
+                <i class="bi bi-key"></i><span>Change Password</span>
+            </a>
+            <a class="mwh-account-action logout" href="../api/auth/logout.php" id="topbarLogoutLink" title="Logout">
+                <i class="bi bi-box-arrow-right"></i><span>Logout</span>
+            </a>
+        </nav>
     </div>
 </header>
 <script src="assets/module-ui.js?v=3" defer></script>
