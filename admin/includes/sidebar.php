@@ -14,6 +14,8 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <a class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php">
             <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span><span>Dashboard</span>
         </a>
+
+        <div class="nav-section-label">MWH Hospitality</div>
         <a class="<?= $currentPage === 'hotels.php' ? 'active' : '' ?>" href="hotels.php">
             <span class="nav-icon"><i class="bi bi-buildings-fill"></i></span><span>Hotels</span>
         </a>
@@ -38,6 +40,15 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <a class="<?= $currentPage === 'payments.php' ? 'active' : '' ?>" href="payments.php">
             <span class="nav-icon"><i class="bi bi-wallet2"></i></span><span>Payments</span>
         </a>
+
+        <div class="nav-section-label">MWH Local</div>
+        <a class="<?= $currentPage === 'local_contractors.php' ? 'active' : '' ?>" href="local_contractors.php">
+            <span class="nav-icon"><i class="bi bi-briefcase"></i></span><span>Contractors</span>
+        </a>
+        <a class="<?= $currentPage === 'local_staff.php' ? 'active' : '' ?>" href="local_staff.php">
+            <span class="nav-icon"><i class="bi bi-person-badge"></i></span><span>Local Staff / Chefs</span>
+        </a>
+
         <a class="<?= $currentPage === 'notifications.php' ? 'active' : '' ?>" href="notifications.php">
             <span class="nav-icon"><i class="bi bi-bell-fill"></i></span><span>Notifications</span>
         </a>
@@ -65,6 +76,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 .candidate-availability-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:800}
 .candidate-availability-badge.available{background:#effcf6;color:#087b50}
 .candidate-availability-badge.unavailable{background:#fff1f2;color:#c9363d}
+.nav-section-label{margin:18px 14px 7px;color:#95a0b2;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
