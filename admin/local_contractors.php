@@ -11,12 +11,12 @@ function e(?string $value): string { return htmlspecialchars((string)$value, ENT
 $search = trim((string)($_GET['search'] ?? ''));
 $status = (string)($_GET['status'] ?? 'all');
 
-// Local contractor registration creates a contractor_profiles row. Use that
-// profile as the Local-role marker; user_app_access may not exist.
+// Contractors are identified by their dedicated contractor profile. Avoid
+// querying user_app_access because installations may not have that table.
 $sql = "SELECT u.id, u.mobile, u.email, u.account_status, u.created_at, u.verified_at,
                ctp.business_name, ctp.business_type, ctp.whatsapp_mobile,
                ctp.full_address, ctp.city, ctp.state, ctp.postcode, ctp.gstin,
-               (SELECT COUNT(*) FROM local_requirements lr WHERE lr.contractor_user_id=u.id AND COALESCE(lr.deleted_at IS NULL, 1)) AS requirement_count
+               (SELECT COUNT(*) FROM local_requirements lr WHERE lr.contractor_user_id=u.id AND (lr.deleted_at IS NULL OR lr.deleted_at IS NULL)) AS requirement_count
         FROM users u
         INNER JOIN contractor_profiles ctp ON ctp.user_id=u.id
         WHERE u.deleted_at IS NULL";
@@ -55,7 +55,7 @@ require __DIR__ . '/includes/sidebar.php';
                     <option value="all">All statuses</option>
                     <option value="pending_verification" <?= $status==='pending_verification'?'selected':'' ?>>Pending</option>
                     <option value="verified" <?= $status==='verified'?'selected':'' ?>>Verified</option>
-                    <option value="rejected" <?= $status==='rejected'?'selected':'' ?>>Rejected</option>
+                    <option value="rejected' <?= $status==='rejected'?'selected':'' ?>>Rejected</option>
                     <option value="blocked" <?= $status==='blocked'?'selected':'' ?>>Blocked</option>
                 </select>
                 <button class="button-secondary" type="submit">Filter</button>
