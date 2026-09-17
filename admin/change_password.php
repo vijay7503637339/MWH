@@ -11,13 +11,12 @@ $message = '';
 $messageType = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $currentPassword = (string)($_POST['current_password'] ?? '');
     $newPassword = (string)($_POST['new_password'] ?? '');
     $confirmPassword = (string)($_POST['confirm_password'] ?? '');
     $adminId = (int)$_SESSION['admin_id'];
 
-    if ($currentPassword === '' || $newPassword === '' || $confirmPassword === '') {
-        $message = 'Please fill in all password fields.';
+    if ($newPassword === '' || $confirmPassword === '') {
+        $message = 'Please fill in both password fields.';
         $messageType = 'error';
     } elseif (strlen($newPassword) < 8) {
         $message = 'New password must be at least 8 characters long.';
@@ -25,28 +24,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($newPassword !== $confirmPassword) {
         $message = 'New password and confirmation do not match.';
         $messageType = 'error';
-    } elseif ($currentPassword === $newPassword) {
-        $message = 'New password must be different from your current password.';
-        $messageType = 'error';
     } else {
-        $stmt = $pdo->prepare('SELECT password_hash FROM admin_users WHERE id = :id AND deleted_at IS NULL LIMIT 1');
-        $stmt->execute(['id' => $adminId]);
-        $adminRecord = $stmt->fetch(PDO::FETCH_ASSOC);
+        $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+        $update = $pdo->prepare('UPDATE admin_users SET password_hash = :password_hash WHERE id = :id AND deleted_at IS NULL');
+        $update->execute([
+            'password_hash' => $newHash,
+            'id' => $adminId,
+        ]);
 
-        if (!$adminRecord || !password_verify($currentPassword, (string)$adminRecord['password_hash'])) {
-            $message = 'Current password is incorrect.';
-            $messageType = 'error';
-        } else {
-            $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
-            $update = $pdo->prepare('UPDATE admin_users SET password_hash = :password_hash WHERE id = :id AND deleted_at IS NULL');
-            $update->execute([
-                'password_hash' => $newHash,
-                'id' => $adminId,
-            ]);
-
+        if ($update->rowCount() > 0) {
             $message = 'Password changed successfully.';
             $messageType = 'success';
             $_POST = [];
+        } else {
+            $message = 'Unable to update password. Please try again.';
+            $messageType = 'error';
         }
     }
 }
@@ -59,7 +51,7 @@ require __DIR__ . '/includes/sidebar.php';
     <div class="topbar">
         <div>
             <h1>Change Password</h1>
-            <p class="muted">Update the password for your MWH admin account.</p>
+            <p class="muted">Set a new password for your MWH admin account.</p>
         </div>
     </div>
 
@@ -67,7 +59,7 @@ require __DIR__ . '/includes/sidebar.php';
         <div class="panel-header">
             <div>
                 <h2>Security Settings</h2>
-                <p class="muted">Use your current password to set a new one.</p>
+                <p class="muted">Enter your new password and confirm it below.</p>
             </div>
             <div class="security-icon"><i class="bi bi-shield-lock-fill"></i></div>
         </div>
@@ -80,14 +72,6 @@ require __DIR__ . '/includes/sidebar.php';
 
         <form method="post" autocomplete="off" novalidate>
             <div class="form-grid">
-                <div class="field full">
-                    <label for="current_password">Current Password</label>
-                    <div class="password-field">
-                        <input type="password" id="current_password" name="current_password" autocomplete="current-password" required>
-                        <button type="button" class="password-toggle" aria-label="Show current password" data-target="current_password"><i class="bi bi-eye"></i></button>
-                    </div>
-                </div>
-
                 <div class="field">
                     <label for="new_password">New Password</label>
                     <div class="password-field">
@@ -143,12 +127,11 @@ document.querySelectorAll('.password-toggle').forEach((toggle) => {
 const newPassword = document.getElementById('new_password');
 const confirmPassword = document.getElementById('confirm_password');
 if (newPassword && confirmPassword) {
-    confirmPassword.addEventListener('input', () => {
+    const validateMatch = () => {
         confirmPassword.setCustomValidity(confirmPassword.value && confirmPassword.value !== newPassword.value ? 'Passwords do not match.' : '');
-    });
-    newPassword.addEventListener('input', () => {
-        confirmPassword.setCustomValidity(confirmPassword.value && confirmPassword.value !== newPassword.value ? 'Passwords do not match.' : '');
-    });
+    };
+    confirmPassword.addEventListener('input', validateMatch);
+    newPassword.addEventListener('input', validateMatch);
 }
 </script>
 
