@@ -198,7 +198,8 @@ require __DIR__ . '/includes/sidebar.php';
                 <div class="table-wrap"><table class="data-table"><thead><tr><th>Document</th><th>Type</th><th>Status</th><th>Uploaded</th><th>File</th></tr></thead><tbody>
                 <?php foreach ($viewDocuments as $doc):
                     $docType = $doc['document_type'] ?? $doc['document_name'] ?? $doc['type'] ?? 'Document';
-                    $filePath = $doc['file_path'] ?? $doc['file_url'] ?? $doc['document_url'] ?? $doc['file'] ?? '';
+                    // The upload API stores the document location in storage_path.
+                    $filePath = $doc['storage_path'] ?? $doc['file_path'] ?? $doc['file_url'] ?? $doc['document_url'] ?? $doc['file'] ?? '';
                     $reviewStatus = $doc['review_status'] ?? $doc['status'] ?? 'pending';
                     $uploadedAt = $doc['created_at'] ?? $doc['uploaded_at'] ?? '—';
                     $safePath = trim((string)$filePath);
