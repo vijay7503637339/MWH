@@ -11,26 +11,22 @@ function e(?string $value): string { return htmlspecialchars((string)$value, ENT
 $search = trim((string)($_GET['search'] ?? ''));
 $status = (string)($_GET['status'] ?? 'all');
 
-// Current Local registrations are represented by contractor_profiles.
-// Do not depend on user_app_access, which may not exist on deployed databases.
-$sql = "SELECT u.id, u.mobile, u.email, u.account_status, u.created_at, u.verified_at,
-               ctp.business_name, ctp.business_type, ctp.whatsapp_mobile,
-               ctp.full_address, ctp.city, ctp.state, ctp.postcode, ctp.gstin,
-               (SELECT COUNT(*) FROM local_requirements lr WHERE lr.contractor_user_id=u.id AND lr.deleted_at IS NULL) AS requirement_count
-        FROM users u
-        INNER JOIN contractor_profiles ctp ON ctp.user_id=u.id
-        WHERE u.deleted_at IS NULL";
+// Local contractor accounts are stored directly in local_users.
+// Keep this page isolated from the legacy hospitality users/profiles tables.
+$sql = "SELECT id, name, mobile, email, aadhaar_number, account_status, created_at
+        FROM local_users
+        WHERE role = 'contractor' AND deleted_at IS NULL";
 $params = [];
 if ($search !== '') {
-    $sql .= ' AND (ctp.business_name LIKE ? OR ctp.business_type LIKE ? OR ctp.city LIKE ? OR u.mobile LIKE ? OR u.email LIKE ?)';
+    $sql .= ' AND (name LIKE ? OR mobile LIKE ? OR email LIKE ? OR aadhaar_number LIKE ?)';
     $term = '%' . $search . '%';
-    array_push($params, $term, $term, $term, $term, $term);
+    array_push($params, $term, $term, $term, $term);
 }
 if (in_array($status, ['pending_verification','verified','rejected','blocked'], true)) {
-    $sql .= ' AND u.account_status=?';
+    $sql .= ' AND account_status = ?';
     $params[] = $status;
 }
-$sql .= ' ORDER BY u.created_at DESC';
+$sql .= ' ORDER BY created_at DESC';
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $contractors = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -43,14 +39,14 @@ require __DIR__ . '/includes/sidebar.php';
         <div>
             <div class="page-kicker"><i class="bi bi-briefcase-fill"></i> MWH Local</div>
             <h1>Local Contractors</h1>
-            <p class="muted">Contractors registered through the Local Contractor & Chef app.</p>
+            <p class="muted">Contractors registered through the Local Contractor &amp; Chef app.</p>
         </div>
     </div>
     <section class="panel">
         <div class="panel-header">
-            <div><h2>Contractor Registrations</h2><p class="muted small">Contractor accounts are identified by their contractor profile; no app-access mapping is required.</p></div>
+            <div><h2>Contractor Registrations</h2><p class="muted small">Records are loaded from local_users where role is contractor.</p></div>
             <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <input name="search" value="<?= e($search) ?>" placeholder="Search business, city, mobile..." class="form-control" style="min-width:240px">
+                <input name="search" value="<?= e($search) ?>" placeholder="Search name, mobile, email, Aadhaar..." class="form-control" style="min-width:240px">
                 <select name="status" class="form-select" style="width:190px">
                     <option value="all">All statuses</option>
                     <option value="pending_verification" <?= $status==='pending_verification'?'selected':'' ?>>Pending</option>
@@ -63,16 +59,14 @@ require __DIR__ . '/includes/sidebar.php';
         </div>
         <div class="table-wrap">
             <table class="data-table">
-                <thead><tr><th>Business</th><th>Contact</th><th>Location</th><th>Type</th><th>Requirements</th><th>Status</th><th>Registered</th></tr></thead>
+                <thead><tr><th>Name</th><th>Contact</th><th>Aadhaar Number</th><th>Status</th><th>Registered</th></tr></thead>
                 <tbody>
-                <?php if (!$contractors): ?><tr><td colspan="7" class="text-center muted">No Local contractors found.</td></tr>
+                <?php if (!$contractors): ?><tr><td colspan="5" class="text-center muted">No Local contractors found.</td></tr>
                 <?php else: foreach ($contractors as $row): ?>
                     <tr>
-                        <td><strong><?= e($row['business_name'] ?: 'Contractor #' . $row['id']) ?></strong><div class="muted small"><?= e($row['gstin'] ?: 'No GSTIN') ?></div></td>
+                        <td><strong><?= e($row['name'] ?: 'Contractor #' . $row['id']) ?></strong></td>
                         <td><?= e($row['mobile']) ?><div class="muted small"><?= e($row['email'] ?: '—') ?></div></td>
-                        <td><?= e(trim(($row['city'] ?: '') . (($row['state'] ?? '') !== '' ? ', ' . $row['state'] : '')) ?: '—') ?></td>
-                        <td><?= e($row['business_type'] ?: '—') ?></td>
-                        <td><?= number_format((int)$row['requirement_count']) ?></td>
+                        <td><?= e($row['aadhaar_number'] ?: '—') ?></td>
                         <td><span class="status-badge <?= e($row['account_status']) ?>"><?= e(ucwords(str_replace('_',' ', $row['account_status']))) ?></span></td>
                         <td><?= e($row['created_at']) ?></td>
                     </tr>
