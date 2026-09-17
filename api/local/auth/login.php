@@ -21,8 +21,8 @@ try {
 
     $stmt = $pdo->prepare(
         'SELECT u.id, u.mobile, u.email, u.password_hash, u.account_status,
-                cp.first_name, cp.last_name, cp.city,
-                ctp.business_name, ctp.business_type
+                cp.user_id AS candidate_profile_id, cp.first_name, cp.last_name, cp.city,
+                ctp.user_id AS contractor_profile_id, ctp.business_name, ctp.business_type
          FROM users u
          LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
          LEFT JOIN contractor_profiles ctp ON ctp.user_id = u.id
@@ -53,26 +53,20 @@ try {
         ], 403);
     }
 
-    $accessStmt = $pdo->prepare(
-        'SELECT role_key, status FROM user_app_access
-         WHERE user_id = ? AND app_key = ? AND status = ?'
-    );
-    $accessStmt->execute([(int)$user['id'], 'mwh_local', 'active']);
-    $accessRows = $accessStmt->fetchAll(PDO::FETCH_ASSOC);
-    $roles = array_values(array_unique(array_map(static fn(array $row): string => $row['role_key'], $accessRows)));
-
-    // Legacy MWH chefs/cooking staff are already users. Link them to MWH Local automatically.
-    $hasCandidateProfile = !empty($user['first_name']) || !empty($user['last_name']);
-    if ($hasCandidateProfile && !in_array('staff', $roles, true)) {
-        localEnsureAccess($pdo, (int)$user['id'], 'staff', 'mwh_hospitality');
+    // A role is available only when its corresponding profile exists.
+    $roles = [];
+    if (!empty($user['candidate_profile_id'])) {
         $roles[] = 'staff';
+    }
+    if (!empty($user['contractor_profile_id'])) {
+        $roles[] = 'contractor';
     }
 
     if ($requestedRole !== '' && !in_array($requestedRole, $roles, true)) {
         localJson([
             'success' => false,
             'code' => 'ROLE_NOT_AVAILABLE',
-            'message' => 'This account is not enabled for the selected MWH Local role.',
+            'message' => 'This account does not have a profile for the selected MWH Local role.',
             'data' => ['available_roles' => $roles]
         ], 403);
     }
@@ -81,8 +75,8 @@ try {
     if ($role === '') {
         localJson([
             'success' => false,
-            'code' => 'LOCAL_ACCESS_REQUIRED',
-            'message' => 'This account is not enabled for MWH Local yet.'
+            'code' => 'LOCAL_PROFILE_REQUIRED',
+            'message' => 'No staff or contractor profile is linked to this account.'
         ], 403);
     }
 
@@ -91,7 +85,7 @@ try {
     $pdo->prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([(int)$user['id']]);
     $pdo->commit();
 
-    unset($user['password_hash']);
+    unset($user['password_hash'], $user['candidate_profile_id'], $user['contractor_profile_id']);
     $user['id'] = (int)$user['id'];
     $user['roles'] = $roles;
     $user['active_role'] = $role;
