@@ -11,13 +11,13 @@ function e(?string $value): string { return htmlspecialchars((string)$value, ENT
 $search = trim((string)($_GET['search'] ?? ''));
 $status = (string)($_GET['status'] ?? 'all');
 
+// Local contractor registration creates a contractor_profiles row. Use that
+// profile as the Local-role marker; user_app_access may not exist.
 $sql = "SELECT u.id, u.mobile, u.email, u.account_status, u.created_at, u.verified_at,
                ctp.business_name, ctp.business_type, ctp.whatsapp_mobile,
                ctp.full_address, ctp.city, ctp.state, ctp.postcode, ctp.gstin,
                (SELECT COUNT(*) FROM local_requirements lr WHERE lr.contractor_user_id=u.id AND COALESCE(lr.deleted_at IS NULL, 1)) AS requirement_count
         FROM users u
-        INNER JOIN user_app_access uaa ON uaa.user_id=u.id
-            AND uaa.app_key='mwh_local' AND uaa.role_key='contractor' AND uaa.status='active'
         INNER JOIN contractor_profiles ctp ON ctp.user_id=u.id
         WHERE u.deleted_at IS NULL";
 $params = [];
@@ -48,7 +48,7 @@ require __DIR__ . '/includes/sidebar.php';
     </div>
     <section class="panel">
         <div class="panel-header">
-            <div><h2>Contractor Registrations</h2><p class="muted small">Only users with active Local contractor access are shown.</p></div>
+            <div><h2>Contractor Registrations</h2><p class="muted small">Contractor accounts are identified by their contractor profile; no app-access mapping is required.</p></div>
             <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <input name="search" value="<?= e($search) ?>" placeholder="Search business, city, mobile..." class="form-control" style="min-width:240px">
                 <select name="status" class="form-select" style="width:190px">
