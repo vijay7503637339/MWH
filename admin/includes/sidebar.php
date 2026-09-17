@@ -55,6 +55,10 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <a class="<?= $currentPage === 'account_deletion_requests.php' ? 'active' : '' ?>" href="account_deletion_requests.php">
             <span class="nav-icon"><i class="bi bi-person-x-fill"></i></span><span>Account Deletion</span>
         </a>
+        <div class="nav-section-label">Account</div>
+        <a class="<?= $currentPage === 'change_password.php' ? 'active' : '' ?>" href="change_password.php">
+            <span class="nav-icon"><i class="bi bi-shield-lock-fill"></i></span><span>Change Password</span>
+        </a>
     </nav>
 
     <div class="sidebar-bottom">
