@@ -21,7 +21,7 @@ try {
     if ($firstName === '' || strlen($firstName) > 100) {
         throw new InvalidArgumentException('First name is required');
     }
-    if ($lastName === '' || strlen($lastName) > 100) {
+    if ($role === 'staff' && ($lastName === '' || strlen($lastName) > 100)) {
         throw new InvalidArgumentException('Last name is required');
     }
     if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -71,13 +71,14 @@ try {
         $fullAddress = trim((string)($data['full_address'] ?? '')) ?: null;
         $city = trim((string)($data['city'] ?? $data['preferred_area'] ?? '')) ?: null;
         $postcode = trim((string)($data['postcode'] ?? '')) ?: null;
+        $safeLastName = $lastName !== '' ? $lastName : 'Staff';
 
         $stmt = $pdo->prepare(
             'INSERT INTO candidate_profiles
              (user_id, first_name, last_name, date_of_birth, gender, full_address, city, country, postcode)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$userId, $firstName, $lastName, $dateOfBirth, $gender, $fullAddress, $city, 'India', $postcode]);
+        $stmt->execute([$userId, $firstName, $safeLastName, $dateOfBirth, $gender, $fullAddress, $city, 'India', $postcode]);
 
         $experience = (float)($data['experience_years'] ?? $data['experience'] ?? 0);
         if ($experience < 0 || $experience > 99.9) {
