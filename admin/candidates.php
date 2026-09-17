@@ -56,14 +56,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($userId <= 0) {
-            throw new RuntimeException('Candidate not found.');
+            throw new RuntimeException('User not found.');
         }
 
-        $find = $pdo->prepare("SELECT u.id, u.account_status FROM users u INNER JOIN user_app_access uaa ON uaa.user_id=u.id AND uaa.app_key='mwh_local' AND uaa.role_key='staff' AND uaa.status='active' WHERE u.id=? AND u.deleted_at IS NULL LIMIT 1");
+        // Allow admin actions for any non-deleted user, regardless of app access, role, or access status.
+        $find = $pdo->prepare('SELECT id, account_status FROM users WHERE id=? AND deleted_at IS NULL LIMIT 1');
         $find->execute([$userId]);
         $candidate = $find->fetch(PDO::FETCH_ASSOC);
         if (!$candidate) {
-            throw new RuntimeException('Candidate not found.');
+            throw new RuntimeException('User not found.');
         }
 
         if ($action === 'verify') {
@@ -136,7 +137,6 @@ if ($viewId > 0) {
         jp.max_travel_distance_km, jp.preferred_working_hours, c.name AS category_name, jr.name AS job_role_name,
         cpp.payment_type, cpp.account_holder_name, cpp.bank_name, cpp.account_number_encrypted, cpp.ifsc_code, cpp.branch_name, cpp.upi_id
         FROM users u
-        INNER JOIN user_app_access uaa ON uaa.user_id=u.id AND uaa.app_key='mwh_local' AND uaa.role_key='staff' AND uaa.status='active'
         LEFT JOIN candidate_profiles cp ON cp.user_id=u.id
         LEFT JOIN professional_details pd ON pd.user_id=u.id
         LEFT JOIN job_preferences jp ON jp.user_id=u.id
@@ -162,9 +162,7 @@ $sql = "SELECT u.id, u.mobile, u.email, u.account_status, u.created_at, u.verifi
         (SELECT COUNT(*) FROM candidate_documents d WHERE d.user_id=u.id AND d.deleted_at IS NULL) AS document_count,
         (SELECT COUNT(*) FROM applications a WHERE a.user_id=u.id) AS application_count
         FROM users u
-        INNER JOIN user_app_access uaa ON uaa.user_id=u.id
-            AND uaa.app_key='mwh_local' AND uaa.role_key='staff' AND uaa.status='active'
-        INNER JOIN candidate_profiles cp ON cp.user_id=u.id
+        LEFT JOIN candidate_profiles cp ON cp.user_id=u.id
         LEFT JOIN job_preferences jp ON jp.user_id=u.id
         LEFT JOIN categories c ON c.id=jp.category_id
         LEFT JOIN job_roles jr ON jr.id=jp.job_role_id
@@ -195,7 +193,7 @@ require __DIR__ . '/includes/sidebar.php';
     <div class="topbar">
         <div>
             <h1>Candidates</h1>
-            <p class="muted">Legacy MWH Hospitality candidate management.</p>
+            <p class="muted">All non-deleted user accounts, regardless of app role or access status.</p>
         </div>
         <?php if ($viewCandidate): ?><a class="button-secondary" href="candidates.php">Back to Candidates</a><?php endif; ?>
     </div>
@@ -227,11 +225,11 @@ require __DIR__ . '/includes/sidebar.php';
     <?php else: ?>
         <section class="panel">
             <div class="panel-header">
-                <div><h2>Hospitality Candidates</h2><p class="muted small">This module is retained separately from MWH Local staff and chefs.</p></div>
+                <div><h2>All Users / Candidates</h2><p class="muted small">Includes active, inactive, blocked, rejected, and users without a candidate profile or app-access role.</p></div>
             </div>
             <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Contact</th><th>Role</th><th>City</th><th>Status</th><th>Registered</th><th>Action</th></tr></thead><tbody>
-            <?php if (!$candidates): ?><tr><td colspan="7" class="text-center muted">No candidates found.</td></tr><?php else: foreach ($candidates as $row): ?>
-                <tr><td><strong><?= e(trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''))) ?></strong></td><td><?= e($row['mobile']) ?><div class="muted small"><?= e($row['email'] ?: '—') ?></div></td><td><?= e($row['job_role_name'] ?: $row['category_name'] ?: '—') ?></td><td><?= e($row['city'] ?: '—') ?></td><td><span class="status-badge <?= e($row['account_status']) ?>"><?= e(ucwords(str_replace('_',' ', $row['account_status']))) ?></span></td><td><?= e($row['created_at']) ?></td><td><a class="button-small" href="candidates.php?view=<?= (int)$row['id'] ?>">View</a></td></tr>
+            <?php if (!$candidates): ?><tr><td colspan="7" class="text-center muted">No users found.</td></tr><?php else: foreach ($candidates as $row): ?>
+                <tr><td><strong><?= e(trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''))) ?: '—' ?></strong></td><td><?= e($row['mobile'] ?? '—') ?><div class="muted small"><?= e($row['email'] ?: '—') ?></div></td><td><?= e($row['job_role_name'] ?: $row['category_name'] ?: '—') ?></td><td><?= e($row['city'] ?: '—') ?></td><td><span class="status-badge <?= e($row['account_status']) ?>"><?= e(ucwords(str_replace('_',' ', $row['account_status']))) ?></span></td><td><?= e($row['created_at']) ?></td><td><a class="button-small" href="candidates.php?view=<?= (int)$row['id'] ?>">View</a></td></tr>
             <?php endforeach; endif; ?></tbody></table></div>
         </section>
     <?php endif; ?>
