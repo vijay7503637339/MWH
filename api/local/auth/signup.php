@@ -136,7 +136,7 @@ try {
         ]);
     }
 
-    localEnsureAccess($pdo, $userId, $role, 'mwh_local');
+    // Role membership is represented by the corresponding profile row. Do not use user_app_access.
     $pdo->commit();
 
     localJson([
