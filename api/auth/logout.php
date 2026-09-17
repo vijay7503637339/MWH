@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 session_start();
-header('Content-Type: application/json; charset=utf-8');
 
 $_SESSION = [];
 
@@ -14,4 +13,6 @@ if (ini_get('session.use_cookies')) {
 
 session_destroy();
 
-echo json_encode(['success' => true, 'message' => 'Logout successful']);
+// Return the browser to the admin login page after logout.
+header('Location: ../../admin/login.php');
+exit;
