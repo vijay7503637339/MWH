@@ -68,19 +68,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $search = trim((string)($_GET['search'] ?? ''));
-$date = trim((string)($_GET['date'] ?? date('Y-m-d')));
+$dateFrom = trim((string)($_GET['from_date'] ?? ''));
+$dateTo = trim((string)($_GET['to_date'] ?? ''));
 $status = (string)($_GET['status'] ?? 'all');
 $hotelId = (int)($_GET['hotel_id'] ?? 0);
 
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-    $date = date('Y-m-d');
+if ($dateFrom !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+    $dateFrom = '';
+}
+if ($dateTo !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+    $dateTo = '';
+}
+if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+    [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
 }
 if (!in_array($status, ['all', 'checked_in', 'checked_out'], true)) {
     $status = 'all';
 }
 
-$where = ['u.deleted_at IS NULL', 'DATE(ar.check_in_at)=?'];
-$params = [$date];
+$where = ['u.deleted_at IS NULL'];
+$params = [];
+
+if ($dateFrom !== '' && $dateTo !== '') {
+    $where[] = 'DATE(ar.check_in_at) BETWEEN ? AND ?';
+    $params[] = $dateFrom;
+    $params[] = $dateTo;
+} elseif ($dateFrom !== '') {
+    $where[] = 'DATE(ar.check_in_at)=?';
+    $params[] = $dateFrom;
+} elseif ($dateTo !== '') {
+    $where[] = 'DATE(ar.check_in_at)=?';
+    $params[] = $dateTo;
+}
 
 if ($search !== '') {
     $where[] = '(cp.first_name LIKE ? OR cp.last_name LIKE ? OR u.mobile LIKE ? OR v.title LIKE ? OR h.name LIKE ?)';
@@ -114,14 +133,30 @@ $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $hotels = $pdo->query("SELECT id,name,city FROM hotels WHERE status='active' AND deleted_at IS NULL ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
-$statsDate = $date;
-$statStmt = $pdo->prepare("SELECT
+$statsWhere = [];
+$statsParams = [];
+if ($dateFrom !== '' && $dateTo !== '') {
+    $statsWhere[] = 'DATE(check_in_at) BETWEEN ? AND ?';
+    $statsParams[] = $dateFrom;
+    $statsParams[] = $dateTo;
+} elseif ($dateFrom !== '') {
+    $statsWhere[] = 'DATE(check_in_at)=?';
+    $statsParams[] = $dateFrom;
+} elseif ($dateTo !== '') {
+    $statsWhere[] = 'DATE(check_in_at)=?';
+    $statsParams[] = $dateTo;
+}
+$statsSql = "SELECT
     COUNT(*) AS total,
     SUM(CASE WHEN check_out_at IS NULL THEN 1 ELSE 0 END) AS checked_in,
     SUM(CASE WHEN check_out_at IS NOT NULL THEN 1 ELSE 0 END) AS checked_out,
     COALESCE(SUM(CASE WHEN check_out_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE,check_in_at,check_out_at) ELSE 0 END),0) AS minutes_worked
-    FROM attendance_records WHERE DATE(check_in_at)=?");
-$statStmt->execute([$statsDate]);
+    FROM attendance_records";
+if ($statsWhere) {
+    $statsSql .= ' WHERE ' . implode(' AND ', $statsWhere);
+}
+$statStmt = $pdo->prepare($statsSql);
+$statStmt->execute($statsParams);
 $stats = $statStmt->fetch(PDO::FETCH_ASSOC) ?: ['total'=>0,'checked_in'=>0,'checked_out'=>0,'minutes_worked'=>0];
 
 $totalAttendance = (int)$pdo->query('SELECT COUNT(*) FROM attendance_records')->fetchColumn();
@@ -177,7 +212,7 @@ require __DIR__ . '/includes/sidebar.php';
     <?php if ($error): ?><div class="attendance-alert error"><i class="bi bi-exclamation-circle-fill"></i><?= e($error) ?></div><?php endif; ?>
 
     <section class="attendance-summary">
-        <div class="attendance-stat"><div class="attendance-stat-icon blue"><i class="bi bi-people"></i></div><div><strong><?= number_format((int)$stats['total']) ?></strong><span>Today's attendance</span></div></div>
+        <div class="attendance-stat"><div class="attendance-stat-icon blue"><i class="bi bi-people"></i></div><div><strong><?= number_format((int)$stats['total']) ?></strong><span><?= $dateFrom === '' && $dateTo === '' ? 'All attendance' : 'Attendance for selected period' ?></span></div></div>
         <div class="attendance-stat"><div class="attendance-stat-icon amber"><i class="bi bi-person-walking"></i></div><div><strong><?= number_format((int)$stats['checked_in']) ?></strong><span>Currently checked in</span></div></div>
         <div class="attendance-stat"><div class="attendance-stat-icon green"><i class="bi bi-check2-circle"></i></div><div><strong><?= number_format((int)$stats['checked_out']) ?></strong><span>Checked out</span></div></div>
         <div class="attendance-stat"><div class="attendance-stat-icon purple"><i class="bi bi-hourglass-split"></i></div><div><strong><?= e($workedLabel) ?></strong><span>Completed hours today</span></div></div>
@@ -193,11 +228,12 @@ require __DIR__ . '/includes/sidebar.php';
 
         <form class="attendance-filters" method="get">
             <div class="attendance-field search-field"><i class="bi bi-search"></i><input type="text" name="search" value="<?= e($search) ?>" placeholder="Search candidate, mobile, vacancy or hotel"></div>
-            <div class="attendance-field"><i class="bi bi-calendar3"></i><input type="date" name="date" value="<?= e($date) ?>"></div>
+            <div class="attendance-field"><i class="bi bi-calendar3"></i><input type="date" name="from_date" value="<?= e($dateFrom) ?>" aria-label="From date"></div>
+            <div class="attendance-field"><i class="bi bi-calendar3"></i><input type="date" name="to_date" value="<?= e($dateTo) ?>" aria-label="To date"></div>
             <div class="attendance-field"><i class="bi bi-funnel"></i><select name="status"><option value="all" <?= $status==='all'?'selected':'' ?>>All Status</option><option value="checked_in" <?= $status==='checked_in'?'selected':'' ?>>Checked In</option><option value="checked_out" <?= $status==='checked_out'?'selected':'' ?>>Checked Out</option></select></div>
             <div class="attendance-field"><i class="bi bi-building"></i><select name="hotel_id"><option value="0">All Hotels</option><?php foreach ($hotels as $hotel): ?><option value="<?= (int)$hotel['id'] ?>" <?= $hotelId===(int)$hotel['id']?'selected':'' ?>><?= e($hotel['name']) ?><?= !empty($hotel['city']) ? ' · '.e($hotel['city']) : '' ?></option><?php endforeach; ?></select></div>
             <button class="attendance-search" type="submit"><i class="bi bi-search"></i> Search</button>
-            <?php if ($search !== '' || $status !== 'all' || $hotelId > 0 || $date !== date('Y-m-d')): ?><a class="attendance-clear" href="attendance.php">Reset</a><?php endif; ?>
+            <?php if ($search !== '' || $status !== 'all' || $hotelId > 0 || $dateFrom !== '' || $dateTo !== ''): ?><a class="attendance-clear" href="attendance.php">Reset</a><?php endif; ?>
         </form>
 
         <div class="attendance-table-wrap">
@@ -250,7 +286,7 @@ require __DIR__ . '/includes/sidebar.php';
 <style>
 .attendance-page{max-width:1600px;margin-right:0!important}.attendance-heading{align-items:center;margin-bottom:22px}.attendance-heading .page-kicker{display:flex;align-items:center;gap:8px;color:#4169e1;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}.attendance-heading h1{font-size:32px;margin-bottom:6px}.attendance-count{text-align:right;min-width:120px}.attendance-count strong{display:block;font-size:30px;line-height:1;color:#172033}.attendance-count span{display:block;color:#7a8498;font-size:12px;margin-top:6px}.attendance-alert{display:flex;align-items:center;gap:9px;padding:12px 15px;border-radius:10px;margin-bottom:16px;font-size:12px;font-weight:650}.attendance-alert.success{background:#ecfbf4;color:#087b50;border:1px solid #c9efdc}.attendance-alert.error{background:#fff1f2;color:#bd3139;border:1px solid #f1ccd0}
 .attendance-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}.attendance-stat{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid #e7ebf2;border-radius:15px;padding:16px;box-shadow:0 4px 14px rgba(20,35,60,.04)}.attendance-stat-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:18px;flex:0 0 42px}.attendance-stat-icon.blue{background:#eef3ff;color:#4169e1}.attendance-stat-icon.amber{background:#fff7e8;color:#bd7a09}.attendance-stat-icon.green{background:#ecfbf4;color:#087b50}.attendance-stat-icon.purple{background:#f3efff;color:#7653c6}.attendance-stat strong{display:block;color:#172033;font-size:21px;line-height:1.1}.attendance-stat span{display:block;color:#7d879a;font-size:11px;margin-top:5px;font-weight:600}
-.attendance-panel{padding:0;overflow:hidden}.attendance-panel-header{padding:22px 24px 16px}.attendance-panel-header h2{margin:0;font-size:18px}.attendance-panel-header p{margin:4px 0 0;font-size:11px}.attendance-filters{display:grid;grid-template-columns:minmax(250px,1fr) 160px 175px minmax(180px,210px) auto auto;gap:9px;align-items:center;padding:0 24px 18px;border-bottom:1px solid #edf0f5}.attendance-field{position:relative}.attendance-field i{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:1;color:#8b95a7;font-size:13px}.attendance-field input,.attendance-field select{width:100%;height:42px;min-height:42px;margin:0;padding:0 12px 0 35px;border-radius:9px;background:#f9fbfe;border-color:#dfe5ee;font-size:12px}.attendance-search,.attendance-clear{height:42px!important;display:inline-flex!important;align-items:center;justify-content:center;gap:7px;padding:0 14px!important;border-radius:9px!important;font-size:11px!important;font-weight:800!important;white-space:nowrap;text-decoration:none}.attendance-search{border:0!important;color:#fff!important;background:linear-gradient(135deg,#3f6ff0,#5d80ed)!important;box-shadow:0 6px 15px rgba(63,111,240,.14)!important}.attendance-clear{border:1px solid #d9e0eb!important;background:#fff!important;color:#65738a!important}
+.attendance-panel{padding:0;overflow:hidden}.attendance-panel-header{padding:22px 24px 16px}.attendance-panel-header h2{margin:0;font-size:18px}.attendance-panel-header p{margin:4px 0 0;font-size:11px}.attendance-filters{display:grid;grid-template-columns:minmax(250px,1fr) 160px 160px 175px minmax(180px,210px) auto auto;gap:9px;align-items:center;padding:0 24px 18px;border-bottom:1px solid #edf0f5}.attendance-field{position:relative}.attendance-field i{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:1;color:#8b95a7;font-size:13px}.attendance-field input,.attendance-field select{width:100%;height:42px;min-height:42px;margin:0;padding:0 12px 0 35px;border-radius:9px;background:#f9fbfe;border-color:#dfe5ee;font-size:12px}.attendance-search,.attendance-clear{height:42px!important;display:inline-flex!important;align-items:center;justify-content:center;gap:7px;padding:0 14px!important;border-radius:9px!important;font-size:11px!important;font-weight:800!important;white-space:nowrap;text-decoration:none}.attendance-search{border:0!important;color:#fff!important;background:linear-gradient(135deg,#3f6ff0,#5d80ed)!important;box-shadow:0 6px 15px rgba(63,111,240,.14)!important}.attendance-clear{border:1px solid #d9e0eb!important;background:#fff!important;color:#65738a!important}
 .attendance-table-wrap{overflow-x:auto}.attendance-table{width:100%;border-collapse:separate;border-spacing:0;min-width:1050px}.attendance-table th{padding:13px 16px;background:#fafbfe;color:#7a8498;border-bottom:1px solid #e7ebf2;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;text-align:left;white-space:nowrap}.attendance-table td{padding:14px 16px;border-bottom:1px solid #eef1f5;vertical-align:middle;background:#fff}.attendance-table tbody tr:hover td{background:#fbfcff}.attendance-table tbody tr:last-child td{border-bottom:0}.candidate-cell{display:flex;align-items:center;gap:10px;min-width:180px}.candidate-avatar{width:36px;height:36px;flex:0 0 36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,#4169e1,#6c8ff4);color:#fff;font-size:11px;font-weight:900}.candidate-cell strong,.primary-cell{display:block;color:#24324a;font-size:12px;font-weight:800}.candidate-cell span,.secondary-cell{display:block;margin-top:4px;color:#8b95a7;font-size:10px;line-height:1.3}.secondary-cell{max-width:200px}.datetime-cell strong{display:block;color:#34425a;font-size:11px;white-space:nowrap}.datetime-cell span{display:block;margin-top:3px;color:#8f99a9;font-size:10px;white-space:nowrap}.datetime-cell .dash{color:#a0a9b7;font-style:italic}.duration-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:#f4f7fb;color:#52617a;font-size:10px;font-weight:750;white-space:nowrap}.attendance-status{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}.attendance-status>span{width:6px;height:6px;border-radius:50%;background:currentColor}.status-in{color:#b26c00;background:#fff7e7}.status-out{color:#087b50;background:#ebfbf4}.attendance-actions{display:flex;gap:6px;align-items:center;white-space:nowrap}.attendance-action{height:31px!important;width:auto!important;margin:0!important;display:inline-flex!important;align-items:center;justify-content:center;gap:5px;padding:0 10px!important;border-radius:8px!important;font-size:10px!important;font-weight:800!important;cursor:pointer;box-shadow:none!important}.attendance-action.view{border:1px solid #dce3ed!important;background:#fff!important;color:#50617b!important}.attendance-action.checkout{border:1px solid #c9d9fa!important;background:#f4f7ff!important;color:#315fc8!important}.attendance-empty{text-align:center!important;padding:58px 20px!important}.attendance-empty i{display:block;color:#aeb8c8;font-size:30px;margin-bottom:8px}.attendance-empty strong{display:block;color:#4b5870;font-size:13px}.attendance-empty span{display:block;color:#909aab;font-size:11px;margin-top:5px}
 .attendance-modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:20px}.attendance-modal.open{display:flex}.attendance-modal-backdrop{position:absolute;inset:0;background:rgba(11,20,36,.48);backdrop-filter:blur(4px)}.attendance-modal-card{position:relative;width:min(650px,100%);background:#fff;border:1px solid #e5e9f0;border-radius:18px;padding:25px;box-shadow:0 25px 70px rgba(10,22,45,.22);z-index:1}.attendance-modal-card.small{width:min(460px,100%)}.modal-close{position:absolute;right:15px;top:15px;width:32px;height:32px;border:1px solid #e4e8ef;border-radius:9px;background:#fff;color:#7b879a;display:grid;place-items:center}.modal-title-row{display:flex;align-items:center;gap:13px;padding-right:35px}.modal-avatar{width:48px;height:48px;border-radius:13px;background:linear-gradient(145deg,#4169e1,#6c8ff4);color:#fff;display:grid;place-items:center;font-weight:900}.modal-title-row .page-kicker{margin-bottom:3px;color:#4169e1;font-size:10px}.modal-title-row h2{margin:0;font-size:20px;color:#172033}.modal-title-row span{font-size:11px;color:#8a95a8}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}.detail-grid>div,.modal-notes{padding:13px;border:1px solid #edf0f4;background:#fafbfe;border-radius:11px}.detail-grid label,.modal-notes label{display:block;color:#8b95a7;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:0 0 5px}.detail-grid strong{display:block;color:#34425a;font-size:12px}.modal-notes{margin-top:12px}.modal-notes p{margin:0;color:#66738a;font-size:11px;line-height:1.5}.modal-icon{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-size:19px;margin-bottom:13px}.modal-icon.warning{background:#fff7e8;color:#bd7a09}.attendance-modal-card.small h2{margin:0 0 7px;font-size:19px}.attendance-modal-card.small>.muted{font-size:11px;line-height:1.5;margin-bottom:17px}.attendance-modal-card textarea{width:100%;margin-top:7px;resize:vertical;min-height:80px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.modal-actions button{width:auto!important;margin:0!important}
 @media(max-width:1100px){.attendance-filters{grid-template-columns:1fr 1fr 1fr}.search-field{grid-column:1/-1}.attendance-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.attendance-search,.attendance-clear{width:100%}}@media(max-width:600px){.attendance-heading{align-items:flex-start}.attendance-count{display:none}.attendance-summary{grid-template-columns:1fr}.attendance-filters{grid-template-columns:1fr;padding:0 16px 16px}.search-field{grid-column:auto}.attendance-panel-header{padding:18px}.detail-grid{grid-template-columns:1fr}.attendance-modal-card{padding:20px}.attendance-page{padding-left:14px!important;padding-right:14px!important}}
