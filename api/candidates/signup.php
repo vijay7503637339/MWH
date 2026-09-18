@@ -6,6 +6,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success'=>false,'message'=>'POST request required']); exit; }
 require_once __DIR__ . '/../config/database.php'; require_once __DIR__ . '/../config/security.php';
 function inputData(): array { $data=json_decode(file_get_contents('php://input') ?: '',true); return is_array($data)?$data:$_POST; }
+function normalizeDateOfBirth(array $data): string {
+ $raw=trim((string)($data['date_of_birth']??$data['dob']??''));
+ if($raw==='') throw new InvalidArgumentException('date_of_birth is required');
+ foreach(['d/m/Y','Y-m-d','d-m-Y','d.m.Y'] as $format){
+  $date=DateTimeImmutable::createFromFormat('!'.$format,$raw);
+  $errors=DateTimeImmutable::getLastErrors();
+  $hasErrors=is_array($errors)&&($errors['warning_count']>0||$errors['error_count']>0);
+  if($date instanceof DateTimeImmutable&&!$hasErrors&&$date->format($format)===$raw){
+   return $date->format('Y-m-d');
+  }
+ }
+ throw new InvalidArgumentException('Invalid date_of_birth. Use DD/MM/YYYY');
+}
 function requiredString(array $data,string $key,int $max=255):string { $v=trim((string)($data[$key]??'')); if($v===''||strlen($v)>$max) throw new InvalidArgumentException("{$key} is required"); return $v; }
 $data=inputData();
 try {
@@ -13,7 +26,7 @@ try {
  $password=requiredString($data,'password',255); if(strlen($password)<8) throw new InvalidArgumentException('Password must be at least 8 characters');
  $email=trim((string)($data['email']??'')); if($email!==''&&!filter_var($email,FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Invalid email address');
  $firstName=requiredString($data,'first_name',100); $lastName=requiredString($data,'last_name',100);
- $dateOfBirth=trim((string)($data['date_of_birth']??$data['dob']??''))?:null; $gender=trim((string)($data['gender']??''))?:null; $fullAddress=trim((string)($data['full_address']??''))?:null;
+ $dateOfBirth=normalizeDateOfBirth($data); $gender=trim((string)($data['gender']??''))?:null; $fullAddress=trim((string)($data['full_address']??''))?:null;
  $preferredArea=trim((string)($data['preferred_area']??''))?:null;
  $city=trim((string)($data['city']??$preferredArea??''))?:null;
  $postcode=trim((string)($data['postcode']??''))?:null;
