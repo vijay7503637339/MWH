@@ -210,20 +210,25 @@ require __DIR__ . '/includes/sidebar.php';
                     // while this admin page is under /MWH/admin/. A plain "uploads/..."
                     // link therefore resolves to /MWH/admin/uploads/... and returns 404.
                     // Normalize the stored relative path to the actual API upload location.
-                    $viewPath = $safePath;
-                    if ($isRelativePath && !$isHttpUrl) {
-                        $viewPath = '../api/' . ltrim(
-                            preg_replace('~^api/~i', '', $safePath),
-                            '/'
-                        );
-                    }
+                    // Candidate documents are protected by the documents/.htaccess rule.
+                    // Do not expose the physical /api/uploads path; let the authenticated
+                    // admin document viewer stream the file securely instead.
+                    $documentIdForView = (int)($doc['id'] ?? 0);
                 ?>
                     <tr>
                         <td><?= e((string)($doc['title'] ?? $doc['document_name'] ?? $docType)) ?></td>
                         <td><?= e((string)$docType) ?></td>
                         <td><span class="status-badge <?= e((string)$reviewStatus) ?>"><?= e(ucwords(str_replace('_',' ', (string)$reviewStatus))) ?></span><?php if (!empty($doc['rejection_reason'])): ?><div class="muted small"><?= e((string)$doc['rejection_reason']) ?></div><?php endif; ?></td>
                         <td><?= e((string)$uploadedAt) ?></td>
-                        <td><?php if ($isHttpUrl || $isRelativePath): ?><a class="button-small" href="<?= e($viewPath) ?>" target="_blank" rel="noopener noreferrer">View / Open</a><?php else: ?>—<?php endif; ?></td>
+                        <td>
+                            <?php if ($documentIdForView > 0): ?>
+                                <a class="button-small" href="document.php?id=<?= $documentIdForView ?>" target="_blank" rel="noopener noreferrer">View / Open</a>
+                            <?php elseif ($isHttpUrl): ?>
+                                <a class="button-small" href="<?= e($safePath) ?>" target="_blank" rel="noopener noreferrer">View / Open</a>
+                            <?php else: ?>
+                                —
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody></table></div>
