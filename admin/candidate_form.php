@@ -205,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $pdo->prepare(
                 'INSERT INTO candidate_profiles(user_id,first_name,last_name,date_of_birth,gender,full_address,city,country,postcode)
-                 VALUES(?,?,?,?,?,NULL,?,'India',NULL)
+                 VALUES(?,?,?,?,?,NULL,?,\'India\',NULL)
                  ON DUPLICATE KEY UPDATE first_name=VALUES(first_name),last_name=VALUES(last_name),date_of_birth=VALUES(date_of_birth),gender=VALUES(gender),city=VALUES(city)'
             );
             $stmt->execute([$editId,$data['first_name'],$data['last_name'],$data['date_of_birth'],$data['gender'],$data['city']]);
@@ -254,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt = $pdo->prepare(
             'INSERT INTO candidate_profiles(user_id,first_name,last_name,date_of_birth,gender,full_address,city,country,postcode)
-             VALUES(?,?,?,?,?,NULL,?,'India',NULL)'
+             VALUES(?,?,?,?,?,NULL,?,\'India\',NULL)'
         );
         $stmt->execute([$newId,$data['first_name'],$data['last_name'],$data['date_of_birth'],$data['gender'],$data['city']]);
 
