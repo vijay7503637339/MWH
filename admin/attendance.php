@@ -117,6 +117,10 @@ if ($hotelId > 0) {
 }
 
 $sql = 'SELECT ar.id,ar.job_id,ar.user_id,ar.check_in_at,ar.check_in_photo_path,ar.check_in_capture_source,ar.check_in_latitude,ar.check_in_longitude,ar.check_in_notes,ar.check_out_at,ar.check_out_notes,
+        CASE
+            WHEN ar.check_out_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, ar.check_in_at, ar.check_out_at)
+            ELSE TIMESTAMPDIFF(MINUTE, ar.check_in_at, CURRENT_TIMESTAMP)
+        END AS worked_minutes,
         cp.first_name,cp.last_name,u.mobile,v.title AS vacancy_title,h.id AS hotel_id,h.name AS hotel_name,h.city AS hotel_city,
         j.status AS job_status,j.payout_amount
         FROM attendance_records ar
@@ -182,14 +186,20 @@ function formatDateTime(?string $value): array
     return [$ts ? date('d M Y', $ts) : $value, $ts ? date('h:i A', $ts) : ''];
 }
 
-function durationLabel(string $checkIn, ?string $checkOut): string
+function durationLabel(?int $workedMinutes): string
 {
-    $start = strtotime($checkIn);
-    if (!$start) return '—';
-    $end = $checkOut ? strtotime($checkOut) : time();
-    if (!$end || $end < $start) return '—';
-    $mins = (int)floor(($end - $start) / 60);
-    return intdiv($mins, 60) . 'h ' . ($mins % 60) . 'm';
+    if ($workedMinutes === null || $workedMinutes < 0) {
+        return '—';
+    }
+
+    $hours = intdiv($workedMinutes, 60);
+    $minutes = $workedMinutes % 60;
+
+    if ($hours === 0) {
+        return $minutes . 'm';
+    }
+
+    return $hours . 'h ' . $minutes . 'm';
 }
 
 require __DIR__ . '/includes/header.php';
@@ -247,15 +257,17 @@ require __DIR__ . '/includes/sidebar.php';
                     [$outDate,$outTime] = formatDateTime($record['check_out_at']);
                     $name = trim(($record['first_name'] ?? '') . ' ' . ($record['last_name'] ?? '')) ?: 'Unknown candidate';
                     $isIn = empty($record['check_out_at']);
+                    $workedMinutes = isset($record['worked_minutes']) ? (int)$record['worked_minutes'] : null;
+                    $workedDuration = durationLabel($workedMinutes);
                 ?>
                     <tr>
                         <td><div class="candidate-cell"><div class="candidate-avatar"><?= e(initials((string)$record['first_name'], (string)$record['last_name'])) ?></div><div><strong><?= e($name) ?></strong><span><?= e((string)$record['mobile']) ?></span></div></div></td>
                         <td><strong class="primary-cell"><?= e((string)$record['vacancy_title']) ?></strong><span class="secondary-cell"><?= e((string)$record['hotel_name']) ?><?= !empty($record['hotel_city']) ? ' · '.e((string)$record['hotel_city']) : '' ?></span></td>
                         <td><div class="datetime-cell"><strong><?= e($inDate) ?></strong><span><?= e($inTime) ?></span></div></td>
                         <td><div class="datetime-cell"><?php if ($record['check_out_at']): ?><strong><?= e($outDate) ?></strong><span><?= e($outTime) ?></span><?php else: ?><span class="dash">Not checked out</span><?php endif; ?></div></td>
-                        <td><span class="duration-badge"><i class="bi bi-stopwatch"></i><?= e(durationLabel((string)$record['check_in_at'], $record['check_out_at'])) ?></span></td>
+                        <td><span class="duration-badge"><i class="bi bi-stopwatch"></i><?= e($workedDuration) ?></span></td>
                         <td><span class="attendance-status <?= $isIn ? 'status-in' : 'status-out' ?>"><span></span><?= $isIn ? 'Checked In' : 'Checked Out' ?></span></td>
-                        <td><div class="attendance-actions"><button type="button" class="attendance-action view" data-id="<?= (int)$record['id'] ?>" data-name="<?= e($name) ?>" data-mobile="<?= e((string)$record['mobile']) ?>" data-job="<?= e((string)$record['vacancy_title']) ?>" data-hotel="<?= e((string)$record['hotel_name']) ?>" data-checkin="<?= e($inDate . ' ' . $inTime) ?>" data-checkout="<?= e($record['check_out_at'] ? $outDate . ' ' . $outTime : 'Not checked out') ?>" data-duration="<?= e(durationLabel((string)$record['check_in_at'], $record['check_out_at'])) ?>" data-source="<?= e((string)$record['check_in_capture_source']) ?>" data-notes="<?= e((string)($record['check_in_notes'] ?? '')) ?>"><i class="bi bi-eye"></i> View</button><?php if ($isIn): ?><button type="button" class="attendance-action checkout" data-checkout-id="<?= (int)$record['id'] ?>" data-checkout-name="<?= e($name) ?>"><i class="bi bi-box-arrow-right"></i> Check Out</button><?php endif; ?></div></td>
+                        <td><div class="attendance-actions"><button type="button" class="attendance-action view" data-id="<?= (int)$record['id'] ?>" data-name="<?= e($name) ?>" data-mobile="<?= e((string)$record['mobile']) ?>" data-job="<?= e((string)$record['vacancy_title']) ?>" data-hotel="<?= e((string)$record['hotel_name']) ?>" data-checkin="<?= e($inDate . ' ' . $inTime) ?>" data-checkout="<?= e($record['check_out_at'] ? $outDate . ' ' . $outTime : 'Not checked out') ?>" data-duration="<?= e($workedDuration) ?>" data-source="<?= e((string)$record['check_in_capture_source']) ?>" data-notes="<?= e((string)($record['check_in_notes'] ?? '')) ?>"><i class="bi bi-eye"></i> View</button><?php if ($isIn): ?><button type="button" class="attendance-action checkout" data-checkout-id="<?= (int)$record['id'] ?>" data-checkout-name="<?= e($name) ?>"><i class="bi bi-box-arrow-right"></i> Check Out</button><?php endif; ?></div></td>
                     </tr>
                 <?php endforeach; endif; ?>
                 </tbody>
