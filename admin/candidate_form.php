@@ -150,6 +150,7 @@ $form = [
     'account_number' => '',
     'ifsc_code' => '',
     'upi_id' => '',
+    'password' => '',
 ];
 
 if ($isEdit) {
@@ -190,7 +191,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $posted = $form;
     foreach (array_keys($form) as $key) {
         if (isset($_POST[$key])) {
-            $posted[$key] = is_string($_POST[$key]) ? trim($_POST[$key]) : $_POST[$key];
+            if ($key === 'password') {
+                $posted[$key] = is_string($_POST[$key]) ? $_POST[$key] : '';
+            } else {
+                $posted[$key] = is_string($_POST[$key]) ? trim($_POST[$key]) : $_POST[$key];
+            }
         }
     }
     $form = $posted;
