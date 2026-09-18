@@ -54,7 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $notes = trim((string)($_POST['check_out_notes'] ?? ''));
             $notes = $notes !== '' ? $notes : null;
-            $stmt = $pdo->prepare('UPDATE attendance_records SET check_out_at=CURRENT_TIMESTAMP, check_out_notes=? WHERE id=?');
+            // Attendance API timestamps are stored in UTC. Keep admin check-out
+            // in the same timezone so duration calculations remain consistent.
+            $stmt = $pdo->prepare('UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_notes=? WHERE id=?');
             $stmt->execute([$notes, $attendanceId]);
 
             $_SESSION['attendance_success'] = 'Candidate checked out successfully.';
@@ -118,8 +120,17 @@ if ($hotelId > 0) {
 
 $sql = 'SELECT ar.id,ar.job_id,ar.user_id,ar.check_in_at,ar.check_in_photo_path,ar.check_in_capture_source,ar.check_in_latitude,ar.check_in_longitude,ar.check_in_notes,ar.check_out_at,ar.check_out_notes,
         CASE
-            WHEN ar.check_out_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, ar.check_in_at, ar.check_out_at)
-            ELSE TIMESTAMPDIFF(MINUTE, ar.check_in_at, CURRENT_TIMESTAMP)
+            WHEN ar.check_out_at IS NOT NULL THEN
+                CASE
+                    WHEN TIMESTAMPDIFF(MINUTE, ar.check_in_at, ar.check_out_at) >= 0
+                        THEN TIMESTAMPDIFF(MINUTE, ar.check_in_at, ar.check_out_at)
+                    -- Older records can contain check-in in IST and check-out in UTC.
+                    -- The exact India offset is 330 minutes; normalize those legacy rows.
+                    WHEN TIMESTAMPDIFF(MINUTE, ar.check_in_at, ar.check_out_at) + 330 >= 0
+                        THEN TIMESTAMPDIFF(MINUTE, ar.check_in_at, ar.check_out_at) + 330
+                    ELSE 0
+                END
+            ELSE GREATEST(0, TIMESTAMPDIFF(MINUTE, ar.check_in_at, UTC_TIMESTAMP()))
         END AS worked_minutes,
         cp.first_name,cp.last_name,u.mobile,v.title AS vacancy_title,h.id AS hotel_id,h.name AS hotel_name,h.city AS hotel_city,
         j.status AS job_status,j.payout_amount
@@ -154,7 +165,16 @@ $statsSql = "SELECT
     COUNT(*) AS total,
     SUM(CASE WHEN check_out_at IS NULL THEN 1 ELSE 0 END) AS checked_in,
     SUM(CASE WHEN check_out_at IS NOT NULL THEN 1 ELSE 0 END) AS checked_out,
-    COALESCE(SUM(CASE WHEN check_out_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE,check_in_at,check_out_at) ELSE 0 END),0) AS minutes_worked
+    COALESCE(SUM(
+        CASE
+            WHEN check_out_at IS NULL THEN 0
+            WHEN TIMESTAMPDIFF(MINUTE,check_in_at,check_out_at) >= 0
+                THEN TIMESTAMPDIFF(MINUTE,check_in_at,check_out_at)
+            WHEN TIMESTAMPDIFF(MINUTE,check_in_at,check_out_at) + 330 >= 0
+                THEN TIMESTAMPDIFF(MINUTE,check_in_at,check_out_at) + 330
+            ELSE 0
+        END
+    ),0) AS minutes_worked
     FROM attendance_records";
 if ($statsWhere) {
     $statsSql .= ' WHERE ' . implode(' AND ', $statsWhere);
@@ -188,16 +208,13 @@ function formatDateTime(?string $value): array
 
 function durationLabel(?int $workedMinutes): string
 {
-    if ($workedMinutes === null || $workedMinutes < 0) {
+    if ($workedMinutes === null) {
         return '—';
     }
 
+    $workedMinutes = max(0, $workedMinutes);
     $hours = intdiv($workedMinutes, 60);
     $minutes = $workedMinutes % 60;
-
-    if ($hours === 0) {
-        return $minutes . 'm';
-    }
 
     return $hours . 'h ' . $minutes . 'm';
 }
