@@ -22,6 +22,21 @@ function e(?string $value): string
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
+function formatDateOfBirth($value): string
+{
+    $value = trim((string)$value);
+    if ($value === '' || $value === '0000-00-00') {
+        return '—';
+    }
+
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    if ($date instanceof DateTimeImmutable && $date->format('Y-m-d') === $value) {
+        return $date->format('d/m/Y');
+    }
+
+    return '—';
+}
+
 function redirectCandidates(?int $viewId = null): never
 {
     header('Location: candidates.php' . ($viewId ? '?view=' . $viewId : ''));
@@ -121,10 +136,10 @@ $viewPreference = null;
 $viewProfessional = null;
 
 if ($viewId > 0) {
-    $stmt = $pdo->prepare("SELECT u.*, cp.first_name, cp.last_name, cp.date_of_birth, cp.gender, cp.full_address, cp.city, cp.country, cp.postcode, cp.referral_code,
-        pd.experience_years, pd.previous_company_name,
-        jp.max_travel_distance_km, jp.preferred_working_hours, c.name AS category_name, jr.name AS job_role_name,
-        cpp.payment_type, cpp.account_holder_name, cpp.bank_name, cpp.account_number_encrypted, cpp.ifsc_code, cpp.branch_name, cpp.upi_id
+    $stmt = $pdo->prepare("SELECT u.*, cp.first_name, cp.last_name, cp.date_of_birth, cp.gender, cp.city,
+        pd.experience_years,
+        c.name AS category_name, jr.name AS job_role_name,
+        cpp.payment_type, cpp.account_holder_name, cpp.bank_name, cpp.account_number_encrypted, cpp.ifsc_code
         FROM users u
         LEFT JOIN candidate_profiles cp ON cp.user_id=u.id
         LEFT JOIN professional_details pd ON pd.user_id=u.id
@@ -185,9 +200,9 @@ require __DIR__ . '/includes/sidebar.php';
     <section class="panel candidate-detail-panel">
         <div class="panel-header"><div><h2><?= e(trim(($viewCandidate['first_name'] ?? '') . ' ' . ($viewCandidate['last_name'] ?? ''))) ?: 'Candidate' ?></h2><p class="muted small"><?= e($viewCandidate['email'] ?? '') ?> · <?= e($viewCandidate['mobile'] ?? '') ?></p></div><span class="status-badge <?= e($viewCandidate['account_status']) ?>"><?= e(ucwords(str_replace('_',' ', $viewCandidate['account_status']))) ?></span></div>
         <div class="candidate-grid">
-            <div class="detail-card"><h3>Personal Information</h3><p><strong>Name</strong><?= e(trim(($viewCandidate['first_name'] ?? '') . ' ' . ($viewCandidate['last_name'] ?? ''))) ?></p><p><strong>Date of Birth</strong><?= e($viewCandidate['date_of_birth'] ?? '—') ?></p><p><strong>Gender</strong><?= e($viewCandidate['gender'] ?? '—') ?></p><p><strong>City</strong><?= e($viewCandidate['city'] ?? '—') ?></p><p><strong>Country</strong><?= e($viewCandidate['country'] ?? '—') ?></p><p><strong>Postcode</strong><?= e($viewCandidate['postcode'] ?? '—') ?></p><p><strong>Address</strong><?= e($viewCandidate['full_address'] ?? '—') ?></p><p><strong>Referral Code</strong><?= e($viewCandidate['referral_code'] ?? '—') ?></p></div>
-            <div class="detail-card"><h3>Professional & Preference</h3><p><strong>Experience</strong><?= e(($viewCandidate['experience_years'] ?? null) !== null ? $viewCandidate['experience_years'] . ' years' : '—') ?></p><p><strong>Previous Company</strong><?= e($viewCandidate['previous_company_name'] ?? '—') ?></p><p><strong>Category</strong><?= e($viewCandidate['category_name'] ?? '—') ?></p><p><strong>Job Role</strong><?= e($viewCandidate['job_role_name'] ?? '—') ?></p><p><strong>Travel Distance</strong><?= e(($viewCandidate['max_travel_distance_km'] ?? null) !== null ? $viewCandidate['max_travel_distance_km'] . ' KM' : '—') ?></p><p><strong>Working Hours</strong><?= e(($viewCandidate['preferred_working_hours'] ?? null) !== null ? $viewCandidate['preferred_working_hours'] . ' hrs' : '—') ?></p></div>
-            <div class="detail-card"><h3>Bank / UPI</h3><p><strong>Payment Type</strong><?= e($viewCandidate['payment_type'] ?? '—') ?></p><p><strong>Account Holder</strong><?= e($viewCandidate['account_holder_name'] ?? '—') ?></p><p><strong>Bank</strong><?= e($viewCandidate['bank_name'] ?? '—') ?></p><p><strong>Account Number</strong><?= !empty($viewCandidate['account_number_encrypted']) ? '••••••' : '—' ?></p><p><strong>IFSC</strong><?= e($viewCandidate['ifsc_code'] ?? '—') ?></p><p><strong>Branch</strong><?= e($viewCandidate['branch_name'] ?? '—') ?></p><p><strong>UPI ID</strong><?= e($viewCandidate['upi_id'] ?? '—') ?></p></div>
+            <div class="detail-card"><h3>Personal Information</h3><p><strong>Name</strong><?= e(trim(($viewCandidate['first_name'] ?? '') . ' ' . ($viewCandidate['last_name'] ?? ''))) ?></p><p><strong>Date of Birth</strong><?= e(formatDateOfBirth($viewCandidate['date_of_birth'] ?? '')) ?></p><p><strong>Gender</strong><?= e($viewCandidate['gender'] ?? '—') ?></p><p><strong>Preferred Area</strong><?= e($viewCandidate['city'] ?? '—') ?></p></div>
+            <div class="detail-card"><h3>Professional Details</h3><p><strong>Experience</strong><?= e(($viewCandidate['experience_years'] ?? null) !== null ? $viewCandidate['experience_years'] . ' years' : '—') ?></p><p><strong>Category</strong><?= e($viewCandidate['category_name'] ?? '—') ?></p><p><strong>Job Role</strong><?= e($viewCandidate['job_role_name'] ?? '—') ?></p></div>
+            <div class="detail-card"><h3>Bank Details</h3><p><strong>Payment Type</strong><?= e($viewCandidate['payment_type'] ?? '—') ?></p><p><strong>Account Holder</strong><?= e($viewCandidate['account_holder_name'] ?? '—') ?></p><p><strong>Bank</strong><?= e($viewCandidate['bank_name'] ?? '—') ?></p><p><strong>Account Number</strong><?= !empty($viewCandidate['account_number_encrypted']) ? '••••••' : '—' ?></p><p><strong>IFSC</strong><?= e($viewCandidate['ifsc_code'] ?? '—') ?></p></div>
         </div>
 
         <section class="detail-card candidate-documents" style="margin-top:20px">
