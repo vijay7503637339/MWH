@@ -205,13 +205,25 @@ require __DIR__ . '/includes/sidebar.php';
                     $safePath = trim((string)$filePath);
                     $isHttpUrl = preg_match('~^https?://~i', $safePath) === 1;
                     $isRelativePath = $safePath !== '' && !str_contains($safePath, '..') && !str_starts_with($safePath, '/') && !str_starts_with($safePath, '\\');
+
+                    // Documents are stored by the app under /MWH/api/uploads/documents/...
+                    // while this admin page is under /MWH/admin/. A plain "uploads/..."
+                    // link therefore resolves to /MWH/admin/uploads/... and returns 404.
+                    // Normalize the stored relative path to the actual API upload location.
+                    $viewPath = $safePath;
+                    if ($isRelativePath && !$isHttpUrl) {
+                        $viewPath = '../api/' . ltrim(
+                            preg_replace('~^api/~i', '', $safePath),
+                            '/'
+                        );
+                    }
                 ?>
                     <tr>
                         <td><?= e((string)($doc['title'] ?? $doc['document_name'] ?? $docType)) ?></td>
                         <td><?= e((string)$docType) ?></td>
                         <td><span class="status-badge <?= e((string)$reviewStatus) ?>"><?= e(ucwords(str_replace('_',' ', (string)$reviewStatus))) ?></span><?php if (!empty($doc['rejection_reason'])): ?><div class="muted small"><?= e((string)$doc['rejection_reason']) ?></div><?php endif; ?></td>
                         <td><?= e((string)$uploadedAt) ?></td>
-                        <td><?php if ($isHttpUrl || $isRelativePath): ?><a class="button-small" href="<?= e($safePath) ?>" target="_blank" rel="noopener noreferrer">View / Open</a><?php else: ?>—<?php endif; ?></td>
+                        <td><?php if ($isHttpUrl || $isRelativePath): ?><a class="button-small" href="<?= e($viewPath) ?>" target="_blank" rel="noopener noreferrer">View / Open</a><?php else: ?>—<?php endif; ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody></table></div>
