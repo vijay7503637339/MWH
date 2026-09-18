@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../api/config/database.php';
+require_once __DIR__ . '/../api/config/security.php';
 
 $pageTitle = 'Payments';
 if (empty($_SESSION['payments_csrf'])) {
@@ -172,8 +173,37 @@ $thisMonth = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM payments WH
 $pendingPayout = (float)$pdo->query('SELECT COALESCE(SUM(GREATEST(j.payout_amount-COALESCE(x.paid,0),0)),0) FROM jobs j LEFT JOIN (SELECT job_id,SUM(amount) AS paid FROM payments WHERE job_id IS NOT NULL GROUP BY job_id) x ON x.job_id=j.id WHERE j.status NOT IN (\'cancelled\',\'rejected\')')->fetchColumn();
 $paymentCount = (int)$pdo->query('SELECT COUNT(*) FROM payments')->fetchColumn();
 
-$jobStmt = $pdo->query('SELECT j.id,j.payout_amount,cp.first_name,cp.last_name,u.mobile,v.title AS vacancy_title,h.name AS hotel_name,COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.job_id=j.id),0) AS paid_amount FROM jobs j INNER JOIN users u ON u.id=j.user_id LEFT JOIN candidate_profiles cp ON cp.user_id=j.user_id INNER JOIN vacancies v ON v.id=j.vacancy_id INNER JOIN hotels h ON h.id=j.hotel_id WHERE j.status NOT IN (\'cancelled\',\'rejected\') ORDER BY j.assigned_at DESC');
+$jobStmt = $pdo->query(
+    "SELECT j.id,j.user_id,j.payout_amount,cp.first_name,cp.last_name,u.mobile,
+            v.title AS vacancy_title,h.name AS hotel_name,
+            cpp.payment_type,cpp.account_holder_name,cpp.bank_name,
+            cpp.account_number_encrypted,cpp.ifsc_code,cpp.upi_id,
+            COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.job_id=j.id),0) AS paid_amount
+     FROM jobs j
+     INNER JOIN users u ON u.id=j.user_id
+     LEFT JOIN candidate_profiles cp ON cp.user_id=j.user_id
+     LEFT JOIN candidate_payment_profiles cpp ON cpp.user_id=j.user_id
+     INNER JOIN vacancies v ON v.id=j.vacancy_id
+     INNER JOIN hotels h ON h.id=j.hotel_id
+     WHERE j.status NOT IN ('cancelled','rejected')
+     ORDER BY j.assigned_at DESC"
+);
 $jobs = $jobStmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($jobs as &$job) {
+    $job['masked_account_number'] = '—';
+    if (!empty($job['account_number_encrypted'])) {
+        try {
+            $accountNumber = decryptSensitive((string)$job['account_number_encrypted']);
+            $job['masked_account_number'] = strlen($accountNumber) > 4
+                ? str_repeat('•', strlen($accountNumber) - 4) . substr($accountNumber, -4)
+                : $accountNumber;
+        } catch (Throwable $error) {
+            $job['masked_account_number'] = '••••';
+        }
+    }
+}
+unset($job);
 
 require __DIR__ . '/includes/header.php';
 require __DIR__ . '/includes/sidebar.php';
@@ -185,7 +215,9 @@ require __DIR__ . '/includes/sidebar.php';
 .payments-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}.payments-toolbar h2{font-size:18px;margin:0}.payments-toolbar p{margin:4px 0 0}.payment-add{height:42px!important;width:auto!important;margin:0!important;padding:0 16px!important;border-radius:10px!important;box-shadow:none!important;white-space:nowrap}
 .payment-filters{display:grid;grid-template-columns:minmax(250px,1fr) 180px 150px 150px auto auto;gap:9px;align-items:center;padding:0 22px 18px;border-bottom:1px solid #edf0f5}.payment-field{position:relative}.payment-field i{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:1;color:#8b95a7;font-size:13px}.payment-field input,.payment-field select{height:42px;padding:0 12px 0 36px;border-radius:9px;background:#f9fbfe;border-color:#e1e6ef}.payment-filter-button,.payment-clear{height:42px;display:inline-flex;align-items:center;justify-content:center;padding:0 13px;border-radius:9px;font-size:12px;font-weight:750}.payment-filter-button{border:0;background:#4169e1;color:#fff}.payment-clear{border:1px solid #d8deea;color:#66738a;background:#fff}
 .payments-table-wrap{overflow-x:auto}.payments-table{width:100%;border-collapse:separate;border-spacing:0;min-width:1050px}.payments-table th{padding:13px 16px;background:#fafbfe;color:#7a8498;border-bottom:1px solid #e7ebf2;font-size:10px;text-transform:uppercase;letter-spacing:.07em;text-align:left;white-space:nowrap}.payments-table td{padding:14px 16px;border-bottom:1px solid #eef1f5;vertical-align:middle;background:#fff}.payments-table tbody tr:hover td{background:#fbfcff}.payments-table tbody tr:last-child td{border-bottom:0}.candidate-cell{display:flex;align-items:center;gap:10px;min-width:180px}.candidate-avatar{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,#4169e1,#6385e9);color:#fff;font-size:12px;font-weight:800;flex:0 0 36px}.candidate-cell strong,.primary-cell{display:block;color:#1c2739;font-size:13px;font-weight:750}.candidate-cell span,.secondary-cell{display:block;margin-top:4px;color:#8a94a6;font-size:11px;line-height:1.3}.secondary-cell{max-width:190px}.amount-cell{font-size:14px;font-weight:800;color:#172033;white-space:nowrap}.date-cell strong{display:block;font-size:12px;color:#303c52;white-space:nowrap}.date-cell span{display:block;margin-top:3px;color:#929bad;font-size:10px}.method-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:#f3f6fb;color:#526078;font-size:10px;font-weight:750;white-space:nowrap}.reference-cell{font-size:11px;color:#66738a;max-width:160px;word-break:break-word}.payment-actions{display:flex;gap:6px;align-items:center}.payment-action{height:30px!important;width:auto!important;margin:0!important;padding:0 9px!important;border-radius:8px!important;border:1px solid #dce3ee!important;background:#fff!important;color:#526078!important;box-shadow:none!important;font-size:10px!important;font-weight:750!important;cursor:pointer}.payment-action.edit{color:#4169e1!important;border-color:#d9e2ff!important;background:#f5f8ff!important}.payment-action.delete{color:#c9363d!important;border-color:#f1c8cb!important;background:#fff8f8!important}.payment-empty{padding:55px 20px!important;text-align:center}.payment-empty i{font-size:30px;color:#a8b1c0}.payment-empty strong{display:block;margin-top:8px;font-size:14px;color:#374258}.payment-empty span{display:block;margin-top:5px;font-size:12px;color:#8b95a7}
-.payment-modal-backdrop{display:none;position:fixed;inset:0;background:rgba(15,25,45,.48);z-index:1000;padding:24px;align-items:center;justify-content:center}.payment-modal-backdrop.open{display:flex}.payment-modal{width:min(620px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(15,25,45,.22)}.payment-modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 22px;border-bottom:1px solid #edf0f5}.payment-modal-head h3{margin:0;font-size:18px;color:#172033}.payment-close{border:0;background:#f3f5f8;width:34px;height:34px;border-radius:9px;color:#66738a;cursor:pointer}.payment-form{padding:20px 22px}.payment-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.payment-form-group.full{grid-column:1/-1}.payment-form-group label{display:block;margin-bottom:6px;font-size:11px;font-weight:750;color:#526078}.payment-form-group input,.payment-form-group select,.payment-form-group textarea{width:100%;border:1px solid #dfe5ee;border-radius:9px;padding:10px 11px;background:#fbfcfe;font:inherit;font-size:12px;box-sizing:border-box}.payment-form-group textarea{min-height:82px;resize:vertical}.payment-job-meta{margin-top:7px;padding:9px 10px;border-radius:9px;background:#f6f8fc;color:#778298;font-size:10px;line-height:1.5}.payment-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.payment-form-actions button{height:40px;border-radius:9px;padding:0 15px;font-weight:750;font-size:12px;border:1px solid #d8deea;background:#fff;color:#66738a;cursor:pointer}.payment-form-actions .primary{border:0;background:#4169e1;color:#fff}.payment-delete-form{display:inline}.payment-note{margin-top:8px;color:#8b95a7;font-size:10px}
+.payment-modal-backdrop{display:none;position:fixed;inset:0;background:rgba(15,25,45,.48);z-index:1000;padding:24px;align-items:center;justify-content:center}.payment-modal-backdrop.open{display:flex}.payment-modal{width:min(620px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(15,25,45,.22)}.payment-modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 22px;border-bottom:1px solid #edf0f5}.payment-modal-head h3{margin:0;font-size:18px;color:#172033}.payment-close{border:0;background:#f3f5f8;width:34px;height:34px;border-radius:9px;color:#66738a;cursor:pointer}.payment-form{padding:20px 22px}.payment-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.payment-form-group.full{grid-column:1/-1}.payment-form-group label{display:block;margin-bottom:6px;font-size:11px;font-weight:750;color:#526078}.payment-form-group input,.payment-form-group select,.payment-form-group textarea{width:100%;border:1px solid #dfe5ee;border-radius:9px;padding:10px 11px;background:#fbfcfe;font:inherit;font-size:12px;box-sizing:border-box}.payment-form-group textarea{min-height:82px;resize:vertical}.payment-job-meta{margin-top:7px;padding:9px 10px;border-radius:9px;background:#f6f8fc;color:#778298;font-size:10px;line-height:1.5}
+.payment-recipient-details{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px;padding:11px;border:1px solid #dfe8f6;border-radius:10px;background:#f8fbff}.payment-recipient-details.open{display:grid}.payment-recipient-details .recipient-item{min-width:0}.payment-recipient-details .recipient-label{display:block;color:#8b95a7;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}.payment-recipient-details .recipient-value{display:block;color:#34425a;font-size:11px;word-break:break-word}.payment-recipient-details .recipient-full{grid-column:1/-1}
+.payment-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.payment-form-actions button{height:40px;border-radius:9px;padding:0 15px;font-weight:750;font-size:12px;border:1px solid #d8deea;background:#fff;color:#66738a;cursor:pointer}.payment-form-actions .primary{border:0;background:#4169e1;color:#fff}.payment-delete-form{display:inline}.payment-note{margin-top:8px;color:#8b95a7;font-size:10px}
 @media(max-width:1100px){.payment-summary{grid-template-columns:repeat(2,1fr)}.payment-filters{grid-template-columns:1fr 1fr 1fr auto}.payment-filters .payment-search{grid-column:1/-1}}
 @media(max-width:760px){.payments-heading{align-items:flex-start}.payments-count{display:none}.payment-summary{grid-template-columns:1fr 1fr}.payment-filters{grid-template-columns:1fr 1fr;padding:0 16px 16px}.payment-filters .payment-search{grid-column:1/-1}.payment-toolbar{align-items:flex-start}.payment-add{padding:0 12px!important}.payment-form-grid{grid-template-columns:1fr}.payment-form-group.full{grid-column:auto}.payments-panel{overflow:hidden}}
 @media(max-width:480px){.payment-summary{grid-template-columns:1fr}.payments-heading h1{font-size:27px}.payments-toolbar{flex-direction:column}.payment-add{width:100%!important}}
@@ -254,7 +286,7 @@ require __DIR__ . '/includes/sidebar.php';
         <form class="payment-form" method="post">
             <input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="action" value="save"><input type="hidden" name="payment_id" id="payment_id" value="0">
             <div class="payment-form-grid">
-                <div class="payment-form-group full"><label for="job_id">Candidate / Job *</label><select name="job_id" id="job_id" required onchange="updateJobMeta()"><option value="">Select candidate job</option><?php foreach ($jobs as $job): $jobName=trim(($job['first_name']??'').' '.($job['last_name']??'')); $remaining=max(0,(float)$job['payout_amount']-(float)$job['paid_amount']); ?><option value="<?=e((string)$job['id'])?>" data-payout="<?=e((string)$job['payout_amount'])?>" data-paid="<?=e((string)$job['paid_amount'])?>" <?=$remaining<=0?'disabled':''?>><?=e($jobName !== '' ? $jobName : 'Candidate #'.$job['id'])?> · <?=e($job['vacancy_title'])?> · <?=e($job['hotel_name'])?> · Remaining ₹<?=number_format($remaining,2)?></option><?php endforeach; ?></select><div class="payment-job-meta" id="jobMeta">Select a job to see payout and remaining balance.</div></div>
+                <div class="payment-form-group full"><label for="job_id">Candidate / Job *</label><select name="job_id" id="job_id" required onchange="updateJobMeta()"><option value="">Select candidate job</option><?php foreach ($jobs as $job): $jobName=trim(($job['first_name']??'').' '.($job['last_name']??'')); $remaining=max(0,(float)$job['payout_amount']-(float)$job['paid_amount']); ?><option value="<?=e((string)$job['id'])?>" data-payout="<?=e((string)$job['payout_amount'])?>" data-paid="<?=e((string)$job['paid_amount'])?>" data-payment-type="<?=e((string)($job['payment_type']??''))?>" data-account-holder="<?=e((string)($job['account_holder_name']??''))?>" data-bank-name="<?=e((string)($job['bank_name']??''))?>" data-account-number="<?=e((string)($job['masked_account_number']??'—'))?>" data-ifsc="<?=e((string)($job['ifsc_code']??''))?>" data-upi="<?=e((string)($job['upi_id']??''))?>" <?=$remaining<=0?'disabled':''?>><?=e($jobName !== '' ? $jobName : 'Candidate #'.$job['id'])?> · <?=e($job['vacancy_title'])?> · <?=e($job['hotel_name'])?> · Remaining ₹<?=number_format($remaining,2)?></option><?php endforeach; ?></select><div class="payment-job-meta" id="jobMeta">Select a candidate to see payout, bank and UPI details.</div><div class="payment-recipient-details" id="paymentRecipientDetails" aria-live="polite"><div class="recipient-item"><span class="recipient-label">Payment Type</span><span class="recipient-value" id="recipientPaymentType">—</span></div><div class="recipient-item"><span class="recipient-label">Account Holder</span><span class="recipient-value" id="recipientAccountHolder">—</span></div><div class="recipient-item"><span class="recipient-label">Bank Name</span><span class="recipient-value" id="recipientBankName">—</span></div><div class="recipient-item"><span class="recipient-label">Account Number</span><span class="recipient-value" id="recipientAccountNumber">—</span></div><div class="recipient-item"><span class="recipient-label">IFSC Code</span><span class="recipient-value" id="recipientIfsc">—</span></div><div class="recipient-item"><span class="recipient-label">UPI ID</span><span class="recipient-value" id="recipientUpi">—</span></div></div></div>
                 <div class="payment-form-group"><label for="amount">Amount *</label><input type="number" name="amount" id="amount" min="0.01" step="0.01" placeholder="0.00" required></div>
                 <div class="payment-form-group"><label for="payment_date">Payment Date *</label><input type="date" name="payment_date" id="payment_date" value="<?=e(date('Y-m-d'))?>" required></div>
                 <div class="payment-form-group"><label for="payment_method">Payment Method *</label><select name="payment_method" id="payment_method" required><option value="bank_transfer">Bank Transfer</option><option value="upi">UPI</option><option value="cash">Cash</option><option value="other">Other</option></select></div>
@@ -285,10 +317,24 @@ function openPaymentModal(){
 function closePaymentModal(){paymentModal.classList.remove('open');}
 function updateJobMeta(){
     const option=jobSelect.options[jobSelect.selectedIndex];
-    if(!option || !option.value){document.getElementById('jobMeta').textContent='Select a job to see payout and remaining balance.';return;}
+    const details=document.getElementById('paymentRecipientDetails');
+    if(!option || !option.value){
+        document.getElementById('jobMeta').textContent='Select a candidate to see payout, bank and UPI details.';
+        details.classList.remove('open');
+        return;
+    }
+
     const payout=parseFloat(option.dataset.payout||0), paid=parseFloat(option.dataset.paid||0), remaining=Math.max(0,payout-paid);
     document.getElementById('jobMeta').textContent='Payout: ₹'+payout.toLocaleString('en-IN',{minimumFractionDigits:2})+'  ·  Already paid: ₹'+paid.toLocaleString('en-IN',{minimumFractionDigits:2})+'  ·  Remaining: ₹'+remaining.toLocaleString('en-IN',{minimumFractionDigits:2});
     document.getElementById('amount').max=remaining.toFixed(2);
+
+    document.getElementById('recipientPaymentType').textContent=option.dataset.paymentType||'—';
+    document.getElementById('recipientAccountHolder').textContent=option.dataset.accountHolder||'—';
+    document.getElementById('recipientBankName').textContent=option.dataset.bankName||'—';
+    document.getElementById('recipientAccountNumber').textContent=option.dataset.accountNumber||'—';
+    document.getElementById('recipientIfsc').textContent=option.dataset.ifsc||'—';
+    document.getElementById('recipientUpi').textContent=option.dataset.upi||'—';
+    details.classList.add('open');
 }
 function editPayment(row){
     document.getElementById('paymentModalTitle').textContent='Edit Payment';
