@@ -32,7 +32,7 @@ $storagePath = trim((string)($document['storage_path'] ?? ''));
 if (
     $storagePath === '' ||
     str_contains($storagePath, '..') ||
-    str_contains($storagePath, '\\\\') ||
+    str_contains($storagePath, '\\') ||
     str_starts_with($storagePath, '/') ||
     str_starts_with($storagePath, '\\')
 ) {
