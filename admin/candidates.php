@@ -188,10 +188,21 @@ $candidates = $stmt->fetchAll(PDO::FETCH_ASSOC);
 require __DIR__ . '/includes/header.php';
 require __DIR__ . '/includes/sidebar.php';
 ?>
+<style>
+.candidate-top-actions{display:flex;align-items:center;gap:8px}.candidate-top-actions a{display:inline-flex;align-items:center;gap:7px}.candidate-list-actions{display:flex;align-items:center;gap:6px}.candidate-list-actions .button-small{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+</style>
+
 <main class="content">
     <div class="topbar">
         <div><h1>Candidates</h1><p class="muted">All non-deleted user accounts, regardless of app role or access status.</p></div>
-        <?php if ($viewCandidate): ?><a class="button-secondary" href="candidates.php">Back to Candidates</a><?php endif; ?>
+        <div class="candidate-top-actions">
+            <?php if ($viewCandidate): ?>
+                <a class="button-secondary" href="candidate_form.php?id=<?= (int)$viewId ?>"><i class="bi bi-pencil-square"></i> Edit Candidate</a>
+                <a class="button-secondary" href="candidates.php">Back to Candidates</a>
+            <?php else: ?>
+                <a class="button-small success" href="candidate_form.php"><i class="bi bi-person-plus"></i> Add Candidate</a>
+            <?php endif; ?>
+        </div>
     </div>
     <?php if ($success): ?><div class="alert success"><?= e($success) ?></div><?php endif; ?>
     <?php foreach ($errors as $error): ?><div class="alert error"><?= e($error) ?></div><?php endforeach; ?>
@@ -261,7 +272,7 @@ require __DIR__ . '/includes/sidebar.php';
     <section class="panel"><div class="panel-header"><div><h2>All Users / Candidates</h2><p class="muted small">Includes active, inactive, blocked, rejected, and users without a candidate profile or app-access role.</p></div></div>
         <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Contact</th><th>Role</th><th>City</th><th>Status</th><th>Registered</th><th>Action</th></tr></thead><tbody>
         <?php if (!$candidates): ?><tr><td colspan="7" class="text-center muted">No users found.</td></tr><?php else: foreach ($candidates as $row): ?>
-            <tr><td><strong><?= e(trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''))) ?: '—' ?></strong></td><td><?= e($row['mobile'] ?? '—') ?><div class="muted small"><?= e($row['email'] ?: '—') ?></div></td><td><?= e($row['job_role_name'] ?: $row['category_name'] ?: '—') ?></td><td><?= e($row['city'] ?: '—') ?></td><td><span class="status-badge <?= e($row['account_status']) ?>"><?= e(ucwords(str_replace('_',' ', $row['account_status']))) ?></span></td><td><?= e($row['created_at']) ?></td><td><a class="button-small" href="candidates.php?view=<?= (int)$row['id'] ?>">View</a></td></tr>
+            <tr><td><strong><?= e(trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''))) ?: '—' ?></strong></td><td><?= e($row['mobile'] ?? '—') ?><div class="muted small"><?= e($row['email'] ?: '—') ?></div></td><td><?= e($row['job_role_name'] ?: $row['category_name'] ?: '—') ?></td><td><?= e($row['city'] ?: '—') ?></td><td><span class="status-badge <?= e($row['account_status']) ?>"><?= e(ucwords(str_replace('_',' ', $row['account_status']))) ?></span></td><td><?= e($row['created_at']) ?></td><td><div class="candidate-list-actions"><a class="button-small" href="candidates.php?view=<?= (int)$row['id'] ?>">View</a><a class="button-small" href="candidate_form.php?id=<?= (int)$row['id'] ?>"><i class="bi bi-pencil"></i> Edit</a></div></td></tr>
         <?php endforeach; endif; ?></tbody></table></div>
     </section>
     <?php endif; ?>
