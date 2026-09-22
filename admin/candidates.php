@@ -153,6 +153,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         throw new RuntimeException('Invalid candidate action.');
     } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         $errors[] = $exception->getMessage();
     }
 }
