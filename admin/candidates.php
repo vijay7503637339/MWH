@@ -122,6 +122,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['candidate_success'] = 'Document review updated.';
             redirectCandidates($userId);
         }
+        if ($action === 'delete') {
+            $confirmText = trim((string)($_POST['confirm_delete'] ?? ''));
+            if ($confirmText !== 'DELETE') {
+                throw new RuntimeException('Delete confirmation is required.');
+            }
+
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare('UPDATE users SET deleted_at=NOW(), updated_at=NOW() WHERE id=? AND deleted_at IS NULL');
+            $stmt->execute([$userId]);
+            if ($stmt->rowCount() !== 1) {
+                throw new RuntimeException('Candidate could not be deleted.');
+            }
+
+            $docStmt = $pdo->prepare('UPDATE candidate_documents SET deleted_at=NOW(), updated_at=NOW() WHERE user_id=? AND deleted_at IS NULL');
+            $docStmt->execute([$userId]);
+
+            auditCandidate(
+                $pdo,
+                $admin,
+                'candidate.deleted',
+                $userId,
+                ['account_status' => $candidate['account_status']],
+                ['deleted_at' => 'now']
+            );
+            $pdo->commit();
+
+            $_SESSION['candidate_success'] = 'Candidate deleted successfully.';
+            redirectCandidates();
+        }
         throw new RuntimeException('Invalid candidate action.');
     } catch (Throwable $exception) {
         $errors[] = $exception->getMessage();
@@ -266,13 +295,20 @@ require __DIR__ . '/includes/sidebar.php';
             <?php if ($viewCandidate['account_status'] !== 'verified'): ?><form method="post"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="verify"><input type="hidden" name="user_id" value="<?= (int)$viewId ?>"><button class="button-small success" type="submit">Verify Candidate</button></form><?php endif; ?>
             <?php if ($viewCandidate['account_status'] !== 'rejected'): ?><form method="post" class="inline-reason"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="reject"><input type="hidden" name="user_id" value="<?= (int)$viewId ?>"><input name="reason" required maxlength="500" placeholder="Rejection reason"><button class="button-small danger" type="submit">Reject</button></form><?php endif; ?>
             <?php if ($viewCandidate['account_status'] !== 'blocked'): ?><form method="post" class="inline-reason"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="block"><input type="hidden" name="user_id" value="<?= (int)$viewId ?>"><input name="reason" required maxlength="500" placeholder="Block reason"><button class="button-small danger" type="submit">Block</button></form><?php else: ?><form method="post"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="unblock"><input type="hidden" name="user_id" value="<?= (int)$viewId ?>"><button class="button-small success" type="submit">Unblock</button></form><?php endif; ?>
+            <form method="post" onsubmit="return confirm('Delete this candidate? The candidate will be removed from the list.');">
+                <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="user_id" value="<?= (int)$viewId ?>">
+                <input type="hidden" name="confirm_delete" value="DELETE">
+                <button class="button-small danger" type="submit"><i class="bi bi-trash"></i> Delete Candidate</button>
+            </form>
         </div>
     </section>
     <?php else: ?>
     <section class="panel"><div class="panel-header"><div><h2>All Users / Candidates</h2><p class="muted small">Includes active, inactive, blocked, rejected, and users without a candidate profile or app-access role.</p></div></div>
         <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Contact</th><th>Role</th><th>City</th><th>Status</th><th>Registered</th><th>Action</th></tr></thead><tbody>
         <?php if (!$candidates): ?><tr><td colspan="7" class="text-center muted">No users found.</td></tr><?php else: foreach ($candidates as $row): ?>
-            <tr><td><strong><?= e(trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''))) ?: '—' ?></strong></td><td><?= e($row['mobile'] ?? '—') ?><div class="muted small"><?= e($row['email'] ?: '—') ?></div></td><td><?= e($row['job_role_name'] ?: $row['category_name'] ?: '—') ?></td><td><?= e($row['city'] ?: '—') ?></td><td><span class="status-badge <?= e($row['account_status']) ?>"><?= e(ucwords(str_replace('_',' ', $row['account_status']))) ?></span></td><td><?= e($row['created_at']) ?></td><td><div class="candidate-list-actions"><a class="button-small" href="candidates.php?view=<?= (int)$row['id'] ?>">View</a><a class="button-small" href="candidate_form.php?id=<?= (int)$row['id'] ?>"><i class="bi bi-pencil"></i> Edit</a></div></td></tr>
+            <tr><td><strong><?= e(trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''))) ?: '—' ?></strong></td><td><?= e($row['mobile'] ?? '—') ?><div class="muted small"><?= e($row['email'] ?: '—') ?></div></td><td><?= e($row['job_role_name'] ?: $row['category_name'] ?: '—') ?></td><td><?= e($row['city'] ?: '—') ?></td><td><span class="status-badge <?= e($row['account_status']) ?>"><?= e(ucwords(str_replace('_',' ', $row['account_status']))) ?></span></td><td><?= e($row['created_at']) ?></td><td><div class="candidate-list-actions"><a class="button-small" href="candidates.php?view=<?= (int)$row['id'] ?>">View</a><a class="button-small" href="candidate_form.php?id=<?= (int)$row['id'] ?>"><i class="bi bi-pencil"></i> Edit</a><form method="post" onsubmit="return confirm('Delete this candidate? The candidate will be removed from the list.');" style="display:inline"><input type="hidden" name="csrf" value="<?= e($csrf) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="user_id" value="<?= (int)$row['id'] ?>"><input type="hidden" name="confirm_delete" value="DELETE"><button class="button-small danger" type="submit"><i class="bi bi-trash"></i> Delete</button></form></div></td></tr>
         <?php endforeach; endif; ?></tbody></table></div>
     </section>
     <?php endif; ?>
