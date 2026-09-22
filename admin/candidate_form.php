@@ -47,8 +47,11 @@ function normalizeAdminDob(string $value): string
     throw new InvalidArgumentException('Invalid date of birth.');
 }
 
-function storeAdminDocuments(PDO $pdo, int $userId): int
+function storeAdminDocuments(PDO $pdo, int $userId, array &$newFiles, array &$oldFiles): int
 {
+    $newFiles = [];
+    $oldFiles = [];
+
     if ($userId <= 0 || !isset($_FILES['documents']['name']) || !is_array($_FILES['documents']['name'])) {
         return 0;
     }
@@ -66,7 +69,6 @@ function storeAdminDocuments(PDO $pdo, int $userId): int
         'image/png' => 'png',
     ];
     $maxSize = 5 * 1024 * 1024;
-    $storedFiles = [];
     $uploadedCount = 0;
 
     try {
@@ -108,29 +110,101 @@ function storeAdminDocuments(PDO $pdo, int $userId): int
                 throw new RuntimeException('Unable to save ' . $label . '.');
             }
 
-            $storedFiles[] = $destination;
+            $newFiles[] = $destination;
             $storagePath = 'uploads/documents/' . $userId . '/' . $storedName;
 
-            $stmt = $pdo->prepare(
-                'INSERT INTO candidate_documents
-                    (user_id, document_type, storage_path, original_file_name, mime_type, file_size_bytes, review_status)
-                 VALUES (?,?,?,?,?,?,\'pending\')'
+            // One active document per candidate + document type.
+            // On Edit, replace the latest existing row instead of creating
+            // another row for the same document type.
+            $existingStmt = $pdo->prepare(
+                'SELECT id, storage_path
+                 FROM candidate_documents
+                 WHERE user_id=? AND document_type=? AND deleted_at IS NULL
+                 ORDER BY created_at DESC, id DESC'
             );
-            $stmt->execute([$userId, $documentType, $storagePath, $originalName, $mime, $fileSize]);
+            $existingStmt->execute([$userId, $documentType]);
+            $existingDocumentsForType = $existingStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if ($existingDocumentsForType) {
+                $primaryDocument = $existingDocumentsForType[0];
+
+                $updateStmt = $pdo->prepare(
+                    'UPDATE candidate_documents
+                     SET storage_path=?, original_file_name=?, mime_type=?, file_size_bytes=?,
+                         review_status=\'pending\', rejection_reason=NULL,
+                         reviewed_at=NULL, reviewed_by_admin_id=NULL, updated_at=NOW()
+                     WHERE id=? AND user_id=? AND deleted_at IS NULL'
+                );
+                $updateStmt->execute([
+                    $storagePath,
+                    $originalName,
+                    $mime,
+                    $fileSize,
+                    (int)$primaryDocument['id'],
+                    $userId,
+                ]);
+
+                $oldStoragePath = trim((string)($primaryDocument['storage_path'] ?? ''));
+                $expectedPrefix = 'uploads/documents/' . $userId . '/';
+                if (
+                    $oldStoragePath !== '' &&
+                    str_starts_with($oldStoragePath, $expectedPrefix) &&
+                    !str_contains($oldStoragePath, '..') &&
+                    !str_contains($oldStoragePath, '\\')
+                ) {
+                    $oldFiles[] = dirname(__DIR__) . '/api/' . $oldStoragePath;
+                }
+
+                // Clean up duplicate active rows created by the old behavior.
+                foreach (array_slice($existingDocumentsForType, 1) as $duplicate) {
+                    $duplicateStmt = $pdo->prepare(
+                        'UPDATE candidate_documents
+                         SET deleted_at=NOW(), updated_at=NOW()
+                         WHERE id=? AND user_id=? AND deleted_at IS NULL'
+                    );
+                    $duplicateStmt->execute([(int)$duplicate['id'], $userId]);
+
+                    $duplicateStoragePath = trim((string)($duplicate['storage_path'] ?? ''));
+                    if (
+                        $duplicateStoragePath !== '' &&
+                        str_starts_with($duplicateStoragePath, $expectedPrefix) &&
+                        !str_contains($duplicateStoragePath, '..') &&
+                        !str_contains($duplicateStoragePath, '\\')
+                    ) {
+                        $oldFiles[] = dirname(__DIR__) . '/api/' . $duplicateStoragePath;
+                    }
+                }
+            } else {
+                $insertStmt = $pdo->prepare(
+                    'INSERT INTO candidate_documents
+                        (user_id, document_type, storage_path, original_file_name, mime_type, file_size_bytes, review_status)
+                     VALUES (?,?,?,?,?,?,\'pending\')'
+                );
+                $insertStmt->execute([
+                    $userId,
+                    $documentType,
+                    $storagePath,
+                    $originalName,
+                    $mime,
+                    $fileSize,
+                ]);
+            }
+
             $uploadedCount++;
         }
 
         return $uploadedCount;
     } catch (Throwable $e) {
-        foreach ($storedFiles as $path) {
+        foreach ($newFiles as $path) {
             if (is_file($path)) {
                 @unlink($path);
             }
         }
+        $newFiles = [];
+        $oldFiles = [];
         throw $e;
     }
 }
-
 $documentTypes = [
     'aadhaar' => 'Aadhaar Card',
     'address_proof' => 'Address Proof',
@@ -344,10 +418,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmt->execute([$editId,$data['payment_type'],$data['account_holder_name'],$data['bank_name'],$encryptedAccount,$data['ifsc_code'],$data['upi_id']]);
 
-            storeAdminDocuments($pdo, $editId);
+            $newDocumentFiles = [];
+            $oldDocumentFiles = [];
+            storeAdminDocuments($pdo, $editId, $newDocumentFiles, $oldDocumentFiles);
 
             auditCandidate($pdo, $admin, 'candidate.updated', $editId, null, ['fields' => 'admin profile edit']);
             $pdo->commit();
+
+            foreach ($oldDocumentFiles as $oldDocumentFile) {
+                if (is_file($oldDocumentFile)) {
+                    @unlink($oldDocumentFile);
+                }
+            }
 
             $_SESSION['candidate_success'] = 'Candidate updated successfully.';
             redirectCandidate($editId);
@@ -391,7 +473,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $stmt->execute([$newId,$data['payment_type'],$data['account_holder_name'],$data['bank_name'],$encryptedAccount,$data['ifsc_code'],$data['upi_id']]);
 
-        storeAdminDocuments($pdo, $newId);
+        $newDocumentFiles = [];
+        $oldDocumentFiles = [];
+        storeAdminDocuments($pdo, $newId, $newDocumentFiles, $oldDocumentFiles);
 
         auditCandidate($pdo, $admin, 'candidate.created_by_admin', $newId, null, ['account_status'=>'verified']);
         $pdo->commit();
@@ -402,6 +486,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
+
+        foreach (($newDocumentFiles ?? []) as $newDocumentFile) {
+            if (is_file($newDocumentFile)) {
+                @unlink($newDocumentFile);
+            }
+        }
+
         $errors[] = $exception instanceof InvalidArgumentException
             ? $exception->getMessage()
             : 'Unable to save candidate. Please check the details and try again.';
@@ -504,7 +595,7 @@ $cities = ['Mumbai','Delhi','Bengaluru','Hyderabad','Chennai','Pune','Kolkata','
                     <label class="form-control">
                         <span><?= e($documentLabel) ?></span>
                         <input type="file" name="documents[<?= e($documentType) ?>]" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
-                        <small class="document-upload-help"><?= $isEdit ? 'Optional — upload to add another file.' : 'Optional document.' ?></small>
+                        <small class="document-upload-help"><?= $isEdit ? 'Optional — uploading replaces the current file for this document type.' : 'Optional document.' ?></small>
                     </label>
                 <?php endforeach; ?>
             </div>
