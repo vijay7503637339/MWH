@@ -47,6 +47,98 @@ function normalizeAdminDob(string $value): string
     throw new InvalidArgumentException('Invalid date of birth.');
 }
 
+function storeAdminDocuments(PDO $pdo, int $userId): int
+{
+    if ($userId <= 0 || !isset($_FILES['documents']['name']) || !is_array($_FILES['documents']['name'])) {
+        return 0;
+    }
+
+    $allowedTypes = [
+        'aadhaar' => 'Aadhaar Card',
+        'address_proof' => 'Address Proof',
+        'pan' => 'PAN Card',
+        'police_verification' => 'Police Verification',
+        'other' => 'Other',
+    ];
+    $allowedMime = [
+        'application/pdf' => 'pdf',
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+    ];
+    $maxSize = 5 * 1024 * 1024;
+    $storedFiles = [];
+    $uploadedCount = 0;
+
+    try {
+        $uploadDir = dirname(__DIR__) . '/api/uploads/documents/' . $userId;
+        foreach ($allowedTypes as $documentType => $label) {
+            $error = (int)($_FILES['documents']['error'][$documentType] ?? UPLOAD_ERR_NO_FILE);
+            if ($error === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+            if ($error !== UPLOAD_ERR_OK) {
+                throw new InvalidArgumentException($label . ' upload failed.');
+            }
+
+            $tmpName = (string)($_FILES['documents']['tmp_name'][$documentType] ?? '');
+            $fileSize = (int)($_FILES['documents']['size'][$documentType] ?? 0);
+            $originalName = basename((string)($_FILES['documents']['name'][$documentType] ?? ''));
+
+            if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+                throw new InvalidArgumentException('Invalid ' . $label . ' upload.');
+            }
+            if ($fileSize <= 0 || $fileSize > $maxSize) {
+                throw new InvalidArgumentException($label . ' must be 5 MB or smaller.');
+            }
+
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = (string)$finfo->file($tmpName);
+            if (!isset($allowedMime[$mime])) {
+                throw new InvalidArgumentException($label . ' must be a PDF, JPG or PNG file.');
+            }
+
+            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+                throw new RuntimeException('Unable to create document upload directory.');
+            }
+
+            $extension = $allowedMime[$mime];
+            $storedName = $documentType . '_' . bin2hex(random_bytes(12)) . '.' . $extension;
+            $destination = $uploadDir . '/' . $storedName;
+            if (!move_uploaded_file($tmpName, $destination)) {
+                throw new RuntimeException('Unable to save ' . $label . '.');
+            }
+
+            $storedFiles[] = $destination;
+            $storagePath = 'uploads/documents/' . $userId . '/' . $storedName;
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO candidate_documents
+                    (user_id, document_type, storage_path, original_file_name, mime_type, file_size_bytes, review_status)
+                 VALUES (?,?,?,?,?,?,\'pending\')'
+            );
+            $stmt->execute([$userId, $documentType, $storagePath, $originalName, $mime, $fileSize]);
+            $uploadedCount++;
+        }
+
+        return $uploadedCount;
+    } catch (Throwable $e) {
+        foreach ($storedFiles as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
+        throw $e;
+    }
+}
+
+$documentTypes = [
+    'aadhaar' => 'Aadhaar Card',
+    'address_proof' => 'Address Proof',
+    'pan' => 'PAN Card',
+    'police_verification' => 'Police Verification',
+    'other' => 'Other',
+];
+
 function validateCandidateForm(PDO $pdo, array $data, bool $isEdit, int $editingId = 0): array
 {
     $firstName = trim((string)($data['first_name'] ?? ''));
@@ -133,6 +225,7 @@ function validateCandidateForm(PDO $pdo, array $data, bool $isEdit, int $editing
 
 $editId = (int)($_GET['id'] ?? 0);
 $isEdit = $editId > 0;
+$existingDocuments = [];
 $form = [
     'first_name' => '',
     'last_name' => '',
@@ -180,6 +273,15 @@ if ($isEdit) {
     if (($form['date_of_birth'] ?? '') === '0000-00-00') {
         $form['date_of_birth'] = '';
     }
+
+    $docStmt = $pdo->prepare(
+        'SELECT id, document_type, original_file_name, mime_type, file_size_bytes, review_status, rejection_reason, created_at
+         FROM candidate_documents
+         WHERE user_id=? AND deleted_at IS NULL
+         ORDER BY created_at DESC'
+    );
+    $docStmt->execute([$editId]);
+    $existingDocuments = $docStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -242,6 +344,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmt->execute([$editId,$data['payment_type'],$data['account_holder_name'],$data['bank_name'],$encryptedAccount,$data['ifsc_code'],$data['upi_id']]);
 
+            storeAdminDocuments($pdo, $editId);
+
             auditCandidate($pdo, $admin, 'candidate.updated', $editId, null, ['fields' => 'admin profile edit']);
             $pdo->commit();
 
@@ -287,6 +391,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $stmt->execute([$newId,$data['payment_type'],$data['account_holder_name'],$data['bank_name'],$encryptedAccount,$data['ifsc_code'],$data['upi_id']]);
 
+        storeAdminDocuments($pdo, $newId);
+
         auditCandidate($pdo, $admin, 'candidate.created_by_admin', $newId, null, ['account_status'=>'verified']);
         $pdo->commit();
 
@@ -327,7 +433,7 @@ $cities = ['Mumbai','Delhi','Bengaluru','Hyderabad','Chennai','Pune','Kolkata','
 
     <?php foreach ($errors as $error): ?><div class="alert error"><i class="bi bi-exclamation-circle"></i> <?= e($error) ?></div><?php endforeach; ?>
 
-    <form class="candidate-form" method="post" autocomplete="off">
+    <form class="candidate-form" method="post" enctype="multipart/form-data" autocomplete="off">
         <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
 
         <section class="panel form-panel">
@@ -365,6 +471,46 @@ $cities = ['Mumbai','Delhi','Bengaluru','Hyderabad','Chennai','Pune','Kolkata','
         </section>
 
         <section class="panel form-panel">
+            <div class="form-section-title"><div class="form-section-icon"><i class="bi bi-file-earmark-arrow-up"></i></div><div><h2>Documents</h2><p>Upload candidate identity and verification documents. PDF, JPG and PNG up to 5 MB each.</p></div></div>
+
+            <?php if ($isEdit): ?>
+                <div class="document-current">
+                    <div class="document-current-title"><strong>Current Documents</strong><span><?= count($existingDocuments) ?> uploaded</span></div>
+                    <?php if (!$existingDocuments): ?>
+                        <p class="muted small">No documents uploaded for this candidate yet.</p>
+                    <?php else: ?>
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>Document</th><th>File</th><th>Status</th><th>Uploaded</th><th></th></tr></thead>
+                                <tbody>
+                                <?php foreach ($existingDocuments as $document): ?>
+                                    <tr>
+                                        <td><?= e($documentTypes[$document['document_type']] ?? ucwords(str_replace('_', ' ', (string)$document['document_type']))) ?></td>
+                                        <td><?= e((string)($document['original_file_name'] ?? 'Document')) ?></td>
+                                        <td><span class="status-badge <?= e((string)$document['review_status']) ?>"><?= e(ucwords(str_replace('_', ' ', (string)$document['review_status']))) ?></span></td>
+                                        <td><?= e((string)($document['created_at'] ?? '—')) ?></td>
+                                        <td><a class="button-small" href="document.php?id=<?= (int)$document['id'] ?>" target="_blank" rel="noopener noreferrer">View</a></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="document-upload-grid">
+                <?php foreach ($documentTypes as $documentType => $documentLabel): ?>
+                    <label class="form-control">
+                        <span><?= e($documentLabel) ?></span>
+                        <input type="file" name="documents[<?= e($documentType) ?>]" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+                        <small class="document-upload-help"><?= $isEdit ? 'Optional — upload to add another file.' : 'Optional document.' ?></small>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </section>
+
+        <section class="panel form-panel">
             <div class="form-section-title"><div class="form-section-icon"><i class="bi bi-shield-lock"></i></div><div><h2>Login Access</h2><p><?= $isEdit ? 'Leave password blank to keep the current password.' : 'Set the password the candidate will use to log in.' ?></p></div></div>
             <div class="form-grid">
                 <label class="form-control"><span>Password <?= $isEdit ? '' : '<b>*</b>' ?></span><input id="candidate_password" type="password" name="password" minlength="8" autocomplete="new-password" <?= $isEdit ? '' : 'required' ?>><small class="password-hint" id="passwordHint"><?= $isEdit ? 'Leave blank to keep the current password.' : 'Use at least 8 characters.' ?></small></label>
@@ -380,9 +526,9 @@ $cities = ['Mumbai','Delhi','Bengaluru','Hyderabad','Chennai','Pune','Kolkata','
 </main>
 
 <style>
-.candidate-form-page{max-width:1280px;margin:0 auto}.candidate-form-topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:22px}.candidate-form-topbar .page-kicker{display:flex;align-items:center;gap:8px;color:#4169e1;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}.candidate-form-topbar h1{margin:0 0 6px;font-size:32px}.candidate-form-topbar .button-secondary{display:inline-flex;align-items:center;gap:7px}
+.candidate-form-page{max-width:1280px;margin:0 auto}.candidate-form-topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:22px}.candidate-form-topbar .page-kicker{display:flex;align-items:center;gap:8px;color:#4169e1;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}.candidate-form-topbar h1{margin:0 0 6px;font-size:32px}.candidate-form-topbar .button-secondary{display:inline-flex;align-items:center;gap:7px}.document-current{padding:14px 15px;background:#fafcff;border:1px solid #e3e9f2;border-radius:12px;margin-bottom:16px}.document-current-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;color:#33415a;font-size:12px}.document-current-title span{color:#8a94a6;font-size:10px;font-weight:700}.document-upload-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.document-upload-help{color:#8a94a6;font-size:10px}
 .form-panel{padding:22px 24px;margin-bottom:16px}.form-section-title{display:flex;align-items:center;gap:12px;padding-bottom:18px;border-bottom:1px solid #edf0f5;margin-bottom:18px}.form-section-icon{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:#eef3ff;color:#4169e1;font-size:17px}.form-section-title h2{margin:0;color:#1b2940;font-size:18px}.form-section-title p{margin:4px 0 0;color:#8a94a6;font-size:11px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.form-control{display:flex;flex-direction:column;gap:7px}.form-control>span{font-size:11px;font-weight:800;color:#55637b}.form-control b{color:#d13b43}.form-control input,.form-control select{width:100%;height:44px;border:1px solid #dfe5ee;border-radius:10px;background:#f9fbfe;padding:0 12px;font-size:13px;color:#28364c;outline:none}.form-control input:focus,.form-control select:focus{border-color:#7c9bf4;box-shadow:0 0 0 3px rgba(65,105,225,.08)}.password-hint{color:#8a94a6;font-size:10px}.access-note{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#effaf5;border:1px solid #caeddc;border-radius:10px;color:#087b50}.access-note i{font-size:18px}.access-note strong{display:block;font-size:11px}.access-note span{display:block;font-size:10px;margin-top:3px;color:#6b8477}.form-actions{display:flex;justify-content:flex-end;gap:9px;padding:4px 0 18px}.form-submit{height:42px!important;padding:0 18px!important;display:inline-flex!important;align-items:center;gap:7px}
-@media(max-width:760px){.candidate-form-topbar{align-items:flex-start}.candidate-form-topbar h1{font-size:27px}.form-grid{grid-template-columns:1fr}.form-panel{padding:18px}.candidate-form-topbar .button-secondary{padding:9px 12px}.form-actions{flex-direction:column-reverse}.form-actions a,.form-submit{width:100%!important;justify-content:center}}
+@media(max-width:760px){.candidate-form-topbar{align-items:flex-start}.candidate-form-topbar h1{font-size:27px}.form-grid,.document-upload-grid{grid-template-columns:1fr}.form-panel{padding:18px}.candidate-form-topbar .button-secondary{padding:9px 12px}.form-actions{flex-direction:column-reverse}.form-actions a,.form-submit{width:100%!important;justify-content:center}}
 </style>
 
 <script>
