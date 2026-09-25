@@ -8,38 +8,22 @@ require_once __DIR__ . '/../api/config/database.php';
 
 function tableCount(PDO $pdo, string $table): int
 {
-    $allowed = ['hotels', 'vacancies', 'users', 'applications', 'attendance_records', 'payments'];
-    if (!in_array($table, $allowed, true)) return 0;
+    $queries = [
+        'hotels' => "SELECT COUNT(*) FROM hotels WHERE status='active' AND deleted_at IS NULL",
+        'vacancies' => "SELECT COUNT(*) FROM vacancies WHERE status='published' AND deleted_at IS NULL",
+        'users' => "SELECT COUNT(*) FROM users u INNER JOIN candidate_profiles cp ON cp.user_id=u.id WHERE u.deleted_at IS NULL",
+        // These tables do not have deleted_at in the Hospitality schema.
+        'applications' => "SELECT COUNT(*) FROM applications",
+        'attendance_records' => "SELECT COUNT(*) FROM attendance_records",
+        'payments' => "SELECT COUNT(*) FROM payments",
+    ];
+
+    if (!isset($queries[$table])) return 0;
 
     try {
-        $where = '';
-
-        // Dashboard cards should represent currently active/visible records,
-        // matching the corresponding admin modules instead of counting soft-deleted
-        // or inactive rows.
-        switch ($table) {
-            case 'hotels':
-                $where = " WHERE status='active' AND deleted_at IS NULL";
-                break;
-            case 'vacancies':
-                $where = " WHERE status='published' AND deleted_at IS NULL";
-                break;
-            case 'users':
-                $where = " WHERE deleted_at IS NULL";
-                break;
-            case 'applications':
-                $where = " WHERE deleted_at IS NULL";
-                break;
-            case 'attendance_records':
-                $where = " WHERE deleted_at IS NULL";
-                break;
-            case 'payments':
-                $where = " WHERE deleted_at IS NULL";
-                break;
-        }
-
-        return (int)$pdo->query("SELECT COUNT(*) FROM `{$table}`{$where}")->fetchColumn();
+        return (int)$pdo->query($queries[$table])->fetchColumn();
     } catch (Throwable $e) {
+        error_log('MWH dashboard count (' . $table . '): ' . $e->getMessage());
         return 0;
     }
 }
