@@ -493,9 +493,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        error_log(
+            'MWH candidate save failed: ' .
+            $exception->getMessage() .
+            ' in ' . $exception->getFile() .
+            ':' . $exception->getLine()
+        );
+
+        // Candidate creation is an authenticated admin-only action. Surface the
+        // underlying server error temporarily so production DB/schema problems
+        // can be diagnosed instead of showing an unhelpful generic message.
         $errors[] = $exception instanceof InvalidArgumentException
             ? $exception->getMessage()
-            : 'Unable to save candidate. Please check the details and try again.';
+            : 'Unable to save candidate: ' . $exception->getMessage();
     }
 }
 
