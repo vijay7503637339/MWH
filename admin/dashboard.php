@@ -10,8 +10,38 @@ function tableCount(PDO $pdo, string $table): int
 {
     $allowed = ['hotels', 'vacancies', 'users', 'applications', 'attendance_records', 'payments'];
     if (!in_array($table, $allowed, true)) return 0;
-    try { return (int)$pdo->query("SELECT COUNT(*) FROM `{$table}`")->fetchColumn(); }
-    catch (Throwable $e) { return 0; }
+
+    try {
+        $where = '';
+
+        // Dashboard cards should represent currently active/visible records,
+        // matching the corresponding admin modules instead of counting soft-deleted
+        // or inactive rows.
+        switch ($table) {
+            case 'hotels':
+                $where = " WHERE status='active' AND deleted_at IS NULL";
+                break;
+            case 'vacancies':
+                $where = " WHERE status='published' AND deleted_at IS NULL";
+                break;
+            case 'users':
+                $where = " WHERE deleted_at IS NULL";
+                break;
+            case 'applications':
+                $where = " WHERE deleted_at IS NULL";
+                break;
+            case 'attendance_records':
+                $where = " WHERE deleted_at IS NULL";
+                break;
+            case 'payments':
+                $where = " WHERE deleted_at IS NULL";
+                break;
+        }
+
+        return (int)$pdo->query("SELECT COUNT(*) FROM `{$table}`{$where}")->fetchColumn();
+    } catch (Throwable $e) {
+        return 0;
+    }
 }
 
 $counts = [
