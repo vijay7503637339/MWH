@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../api/config/database.php';
+require_once __DIR__ . '/../api/config/security.php';
 
 $pageTitle = 'Candidates';
 $admin = currentAdmin();
@@ -245,7 +246,16 @@ require __DIR__ . '/includes/sidebar.php';
         <div class="candidate-grid">
             <div class="detail-card"><h3>Personal Information</h3><p><strong>Name</strong><?= e(trim(($viewCandidate['first_name'] ?? '') . ' ' . ($viewCandidate['last_name'] ?? ''))) ?></p><p><strong>Date of Birth</strong><?= e(formatDateOfBirth($viewCandidate['date_of_birth'] ?? '')) ?></p><p><strong>Gender</strong><?= e($viewCandidate['gender'] ?? '—') ?></p><p><strong>Preferred Area</strong><?= e($viewCandidate['city'] ?? '—') ?></p></div>
             <div class="detail-card"><h3>Professional Details</h3><p><strong>Experience</strong><?= e(($viewCandidate['experience_years'] ?? null) !== null ? $viewCandidate['experience_years'] . ' years' : '—') ?></p><p><strong>Category</strong><?= e($viewCandidate['category_name'] ?? '—') ?></p><p><strong>Job Role</strong><?= e($viewCandidate['job_role_name'] ?? '—') ?></p></div>
-            <div class="detail-card"><h3>Bank Details</h3><p><strong>Payment Type</strong><?= e($viewCandidate['payment_type'] ?? '—') ?></p><p><strong>Account Holder</strong><?= e($viewCandidate['account_holder_name'] ?? '—') ?></p><p><strong>Bank</strong><?= e($viewCandidate['bank_name'] ?? '—') ?></p><p><strong>Account Number</strong><?= !empty($viewCandidate['account_number_encrypted']) ? '••••••' : '—' ?></p><p><strong>IFSC</strong><?= e($viewCandidate['ifsc_code'] ?? '—') ?></p></div>
+            <div class="detail-card"><h3>Bank Details</h3><p><strong>Payment Type</strong><?= e($viewCandidate['payment_type'] ?? '—') ?></p><p><strong>Account Holder</strong><?= e($viewCandidate['account_holder_name'] ?? '—') ?></p><p><strong>Bank</strong><?= e($viewCandidate['bank_name'] ?? '—') ?></p><p><strong>Account Number</strong><?php
+                $accountNumber = '—';
+                if (!empty($viewCandidate['account_number_encrypted'])) {
+                    try {
+                        $accountNumber = decryptSensitive((string)$viewCandidate['account_number_encrypted']);
+                    } catch (Throwable $decryptError) {
+                        $accountNumber = 'Unable to decrypt';
+                    }
+                }
+                ?><?= e($accountNumber) ?></p><p><strong>IFSC</strong><?= e($viewCandidate['ifsc_code'] ?? '—') ?></p></div>
         </div>
 
         <section class="detail-card candidate-documents" style="margin-top:20px">
