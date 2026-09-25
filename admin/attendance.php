@@ -88,7 +88,9 @@ if (!in_array($status, ['all', 'checked_in', 'checked_out'], true)) {
     $status = 'all';
 }
 
-$where = ['u.deleted_at IS NULL'];
+// Attendance is a historical record. Do not hide it when a candidate's
+// account is soft-deleted; the attendance row itself remains valid.
+$where = [];
 $params = [];
 
 if ($dateFrom !== '' && $dateTo !== '') {
