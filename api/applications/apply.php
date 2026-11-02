@@ -25,86 +25,29 @@ if ($vacancyId <= 0) {
 }
 
 try {
+    // Load the vacancy by ID only. Allow applications even when the vacancy
+    // is unpublished, past its closing date, soft-deleted, or its hotel is inactive.
     $stmt = $pdo->prepare(
-        "SELECT
-            v.id,
-            v.title,
-            v.openings_count,
-            v.published_at,
-            v.closing_at
+        "SELECT v.id, v.title
          FROM vacancies v
-         INNER JOIN hotels h ON h.id = v.hotel_id
          WHERE v.id = ?
-           AND v.status = 'published'
-           AND v.deleted_at IS NULL
-           AND h.status = 'active'
-           AND h.deleted_at IS NULL
          LIMIT 1"
     );
     $stmt->execute([$vacancyId]);
     $vacancy = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // A real vacancy row is still required because applications.vacancy_id
+    // references vacancies.id.
     if (!$vacancy) {
-        respond(['success' => false, 'message' => 'Job not found or no longer available'], 404);
+        respond(['success' => false, 'message' => 'Job record not found'], 404);
     }
 
-    if ($vacancy['published_at'] !== null && strtotime((string)$vacancy['published_at']) > time()) {
-        respond(['success' => false, 'message' => 'This job is not open for applications yet'], 409);
-    }
-
-    if ($vacancy['closing_at'] !== null && strtotime((string)$vacancy['closing_at']) <= time()) {
-        respond(['success' => false, 'message' => 'Applications for this job are closed'], 409);
-    }
-
-    $existingStmt = $pdo->prepare(
-        'SELECT id, status, applied_at
-         FROM applications
-         WHERE vacancy_id = ? AND user_id = ?
-         LIMIT 1'
-    );
-    $existingStmt->execute([$vacancyId, (int)$user['user_id']]);
-    $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($existing) {
-        respond([
-            'success' => false,
-            'message' => 'You have already applied for this job',
-            'data' => [
-                'application_id' => (int)$existing['id'],
-                'vacancy_id' => $vacancyId,
-                'status' => $existing['status'],
-                'applied_at' => $existing['applied_at'],
-            ]
-        ], 409);
-    }
-
-    $countStmt = $pdo->prepare(
-        "SELECT COUNT(*)
-         FROM applications
-         WHERE vacancy_id = ?
-           AND status IN ('applied', 'shortlisted', 'selected')"
-    );
-    $countStmt->execute([$vacancyId]);
-    $activeApplications = (int)$countStmt->fetchColumn();
-
-    $openings = (int)$vacancy['openings_count'];
-    if ($openings > 0 && $activeApplications >= $openings) {
-        respond(['success' => false, 'message' => 'This job currently has no remaining openings'], 409);
-    }
-
+    // Duplicate applications are allowed. Each submission creates a new row.
     $insert = $pdo->prepare(
         "INSERT INTO applications (vacancy_id, user_id, status)
          VALUES (?, ?, 'applied')"
     );
-
-    try {
-        $insert->execute([$vacancyId, (int)$user['user_id']]);
-    } catch (PDOException $e) {
-        if ((string)$e->getCode() === '23000') {
-            respond(['success' => false, 'message' => 'You have already applied for this job'], 409);
-        }
-        throw $e;
-    }
+    $insert->execute([$vacancyId, (int)$user['user_id']]);
 
     $applicationId = (int)$pdo->lastInsertId();
     $appliedAt = date('Y-m-d H:i:s');
