@@ -285,7 +285,6 @@ CREATE TABLE applications (
     rejection_reason VARCHAR(500) NULL,
     notes TEXT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_application_candidate_vacancy (vacancy_id, user_id),
     INDEX idx_applications_user_status (user_id, status),
     INDEX idx_applications_vacancy_status (vacancy_id, status),
     CONSTRAINT fk_application_vacancy FOREIGN KEY (vacancy_id) REFERENCES vacancies(id),
