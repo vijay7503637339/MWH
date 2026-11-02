@@ -15,9 +15,35 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   $id=(int)($_POST['application_id']??0); $action=(string)($_POST['action']??'');
   $find=$pdo->prepare('SELECT id,status,user_id,vacancy_id FROM applications WHERE id=? LIMIT 1'); $find->execute([$id]); $app=$find->fetch(PDO::FETCH_ASSOC);
   if(!$app)throw new RuntimeException('Application not found.');
+  $admin=currentAdmin();
+
+  // Delete only standalone applications. Preserve jobs and their attendance/payment history.
+  if($action==='delete'){
+   $pdo->beginTransaction();
+   try{
+    $jobCheck=$pdo->prepare('SELECT id FROM jobs WHERE application_id=? LIMIT 1 FOR UPDATE');
+    $jobCheck->execute([$id]);
+    if($jobCheck->fetchColumn()){
+     throw new RuntimeException('This application cannot be deleted because a job is already assigned. Its job, attendance and payment history must be preserved.');
+    }
+    $locked=$pdo->prepare('SELECT id,status,user_id,vacancy_id,applied_at FROM applications WHERE id=? LIMIT 1 FOR UPDATE');
+    $locked->execute([$id]); $app=$locked->fetch(PDO::FETCH_ASSOC);
+    if(!$app)throw new RuntimeException('Application not found.');
+    $audit=$pdo->prepare('INSERT INTO audit_logs(actor_type,actor_id,action,entity_type,entity_id,old_values,new_values,ip_address,user_agent) VALUES(?,?,?,?,?,?,?,?,?)');
+    $audit->execute(['admin',$admin['id'],'application.deleted','application',$id,json_encode(['status'=>$app['status'],'user_id'=>(int)$app['user_id'],'vacancy_id'=>(int)$app['vacancy_id'],'applied_at'=>$app['applied_at']],JSON_UNESCAPED_UNICODE),json_encode(['deleted'=>true],JSON_UNESCAPED_UNICODE),$_SERVER['REMOTE_ADDR']??null,$_SERVER['HTTP_USER_AGENT']??null]);
+    $delete=$pdo->prepare('DELETE FROM applications WHERE id=?');
+    $delete->execute([$id]);
+    $pdo->commit();
+   }catch(Throwable $deleteError){
+    if($pdo->inTransaction())$pdo->rollBack();
+    throw $deleteError;
+   }
+   $_SESSION['applications_success']='Application deleted successfully.';
+   redirectApplications();
+  }
+
   $map=['contact'=>'contacted','select'=>'selected','reject'=>'rejected']; if(!isset($map[$action]))throw new RuntimeException('Invalid application action.');
   $new=$map[$action]; $reason=trim((string)($_POST['reason']??'')); if($new==='rejected'&&$reason==='')$reason='Application rejected by admin';
-  $admin=currentAdmin();
   $stmt=$pdo->prepare('UPDATE applications SET status=?,reviewed_at=NOW(),reviewed_by_admin_id=?,rejection_reason=?,notes=? WHERE id=?');
   $stmt->execute([$new,$admin['id'],$new==='rejected'?$reason:null,$reason!==''?$reason:null,$id]);
   $audit=$pdo->prepare('INSERT INTO audit_logs(admin_user_id,user_id,action,entity_type,entity_id,old_values,new_values,ip_address,user_agent) VALUES(?,?,?,?,?,?,?,?,?)');
@@ -119,6 +145,7 @@ require __DIR__.'/includes/header.php'; require __DIR__.'/includes/sidebar.php';
                         <td><span class="application-status status-<?=e($row['status'])?>"><span></span><?=e(ucfirst($row['status']))?></span></td>
                         <td><div class="application-actions">
                             <a class="application-action view" href="candidates.php?view=<?=e((string)$row['user_id'])?>"><i class="bi bi-person"></i>&nbsp; Candidate</a>
+                            <form method="post" onsubmit="return confirm('Are you sure you want to permanently delete this application? Candidate account will not be deleted. Applications linked to an assigned job cannot be deleted.');"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="delete"><button class="application-action reject" type="submit"><i class="bi bi-trash"></i>&nbsp; Delete</button></form>
                             <?php if($row['status']==='applied'):?>
                                 <form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="contact"><button class="application-action contact" type="submit">Contact</button></form>
                                 <form method="post"><input type="hidden" name="csrf" value="<?=e($csrf)?>"><input type="hidden" name="application_id" value="<?=e((string)$row['id'])?>"><input type="hidden" name="action" value="select"><button class="application-action select" type="submit"><i class="bi bi-check2"></i>&nbsp; Select</button></form>
