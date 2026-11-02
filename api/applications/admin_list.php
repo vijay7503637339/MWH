@@ -28,7 +28,7 @@ try {
         INNER JOIN hotels h ON h.id=v.hotel_id
         LEFT JOIN categories c ON c.id=v.category_id
         LEFT JOIN job_roles jr ON jr.id=v.job_role_id
-        WHERE u.deleted_at IS NULL";
+        WHERE u.deleted_at IS NULL AND a.deleted_at IS NULL";
     $params=[];
     if (in_array($status,['applied','contacted','selected','rejected'],true)) { $sql .= ' AND a.status=?'; $params[]=$status; }
     if ($search !== '') {
