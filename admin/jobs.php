@@ -10,6 +10,27 @@ if (empty($_SESSION['jobs_csrf'])) $_SESSION['jobs_csrf'] = bin2hex(random_bytes
 $csrf = $_SESSION['jobs_csrf'];
 $success = $_SESSION['jobs_success'] ?? ''; unset($_SESSION['jobs_success']);
 $error = $_SESSION['jobs_error'] ?? ''; unset($_SESSION['jobs_error']);
+
+function deleteAttendancePhotoFile(?string $storedPath): void
+{
+    $storedPath = trim((string)$storedPath);
+    if ($storedPath === '' || str_contains($storedPath, '..') || str_contains($storedPath, '\\\\')) {
+        return;
+    }
+
+    $apiRoot = realpath(__DIR__ . '/../api');
+    $checkinRoot = realpath(__DIR__ . '/../api/uploads/checkins');
+    if ($apiRoot === false || $checkinRoot === false) {
+        return;
+    }
+
+    $photoFile = realpath($apiRoot . '/' . ltrim($storedPath, '/'));
+    $allowedRoot = rtrim($checkinRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    if ($photoFile !== false && is_file($photoFile) && str_starts_with($photoFile, $allowedRoot)) {
+        @unlink($photoFile);
+    }
+}
+
 $status = (string)($_GET['status'] ?? 'all');
 $allowed = ['all','selected','upcoming','checked_in','completed','paid','cancelled'];
 if (!in_array($status, $allowed, true)) $status = 'all';
@@ -41,16 +62,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
             throw new RuntimeException('This job has payment history. Delete is blocked to protect financial records. Review/refund the payment first.');
         }
 
+        $activeAttendance = $pdo->prepare('SELECT COUNT(*) FROM attendance_records WHERE job_id = ? AND check_out_at IS NULL');
+        $activeAttendance->execute([$jobId]);
+        if ((int)$activeAttendance->fetchColumn() > 0) {
+            throw new RuntimeException('This candidate is currently checked in. Check out the candidate before deleting this job assignment.');
+        }
+
+        $photoStmt = $pdo->prepare('SELECT check_in_photo_path FROM attendance_records WHERE job_id = ? FOR UPDATE');
+        $photoStmt->execute([$jobId]);
+        $attendancePhotoPaths = $photoStmt->fetchAll(PDO::FETCH_COLUMN);
+
         $attendanceDelete = $pdo->prepare('DELETE FROM attendance_records WHERE job_id = ?');
         $attendanceDelete->execute([$jobId]);
 
-        // Keep notification history, but detach the deleted job ID from its JSON payload.
-        $notificationRows = $pdo->prepare("SELECT id, data_json FROM notifications WHERE data_json IS NOT NULL AND JSON_VALID(data_json) AND JSON_UNQUOTE(JSON_EXTRACT(data_json, '$.job_id')) = ?");
-        $notificationRows->execute([(string)$jobId]);
-        $notificationUpdate = $pdo->prepare("UPDATE notifications SET data_json = JSON_REMOVE(data_json, '$.job_id') WHERE id = ?");
-        foreach ($notificationRows->fetchAll(PDO::FETCH_ASSOC) as $notificationRow) {
-            $notificationUpdate->execute([(int)$notificationRow['id']]);
-        }
+        // Keep the notification history, but make it clear that the assignment was removed
+        // and detach the deleted job ID so the app cannot navigate to a missing job.
+        $notificationUpdate = $pdo->prepare(
+            "UPDATE notifications
+             SET title = 'Job Assignment Removed',
+                 message = 'Your previous job assignment has been removed by the administrator.',
+                 data_json = JSON_REMOVE(data_json, '$.job_id')
+             WHERE type = 'job'
+               AND data_json IS NOT NULL
+               AND JSON_VALID(data_json)
+               AND JSON_UNQUOTE(JSON_EXTRACT(data_json, '$.job_id')) = ?"
+        );
+        $notificationUpdate->execute([(string)$jobId]);
 
         $admin = currentAdmin();
         $audit = $pdo->prepare('INSERT INTO audit_logs(actor_type, actor_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent) VALUES(?,?,?,?,?,?,?,?,?)');
@@ -64,6 +101,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         $delete = $pdo->prepare('DELETE FROM jobs WHERE id = ?');
         $delete->execute([$jobId]);
         $pdo->commit();
+
+        foreach ($attendancePhotoPaths as $photoPath) {
+            deleteAttendancePhotoFile((string)$photoPath);
+        }
 
         $_SESSION['jobs_success'] = 'Job assignment and its attendance records deleted successfully.';
     } catch (Throwable $ex) {
