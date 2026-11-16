@@ -14,7 +14,7 @@ $error = $_SESSION['jobs_error'] ?? ''; unset($_SESSION['jobs_error']);
 function deleteAttendancePhotoFile(?string $storedPath): void
 {
     $storedPath = trim((string)$storedPath);
-    if ($storedPath === '' || str_contains($storedPath, '..') || str_contains($storedPath, '\\\\')) {
+    if ($storedPath === '' || str_contains($storedPath, '..') || str_contains($storedPath, '\\')) {
         return;
     }
 
