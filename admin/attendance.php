@@ -21,6 +21,27 @@ function e(?string $value): string
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
+
+function deleteAttendancePhotoFile(?string $storedPath): void
+{
+    $storedPath = trim((string)$storedPath);
+    if ($storedPath === '' || str_contains($storedPath, '..') || str_contains($storedPath, '\\\\')) {
+        return;
+    }
+
+    $apiRoot = realpath(__DIR__ . '/../api');
+    $checkinRoot = realpath(__DIR__ . '/../api/uploads/checkins');
+    if ($apiRoot === false || $checkinRoot === false) {
+        return;
+    }
+
+    $photoFile = realpath($apiRoot . '/' . ltrim($storedPath, '/'));
+    $allowedRoot = rtrim($checkinRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    if ($photoFile !== false && is_file($photoFile) && str_starts_with($photoFile, $allowedRoot)) {
+        @unlink($photoFile);
+    }
+}
+
 function redirectAttendance(): never
 {
     header('Location: attendance.php');
@@ -88,14 +109,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $delete = $pdo->prepare('DELETE FROM attendance_records WHERE id = ?');
             $delete->execute([$attendanceId]);
+
+            // If the removed row was the active check-in, restore the job to a
+            // check-in-capable state so the mobile/API lifecycle is not stranded.
+            if (empty($old['check_out_at'])) {
+                $openCheckIn = $pdo->prepare('SELECT COUNT(*) FROM attendance_records WHERE job_id = ? AND check_out_at IS NULL');
+                $openCheckIn->execute([(int)$old['job_id']]);
+                if ((int)$openCheckIn->fetchColumn() === 0) {
+                    $resetJob = $pdo->prepare(
+                        "UPDATE jobs SET status = 'upcoming', completed_at = NULL, updated_at = CURRENT_TIMESTAMP
+                         WHERE id = ? AND status = 'checked_in'"
+                    );
+                    $resetJob->execute([(int)$old['job_id']]);
+                }
+            }
+
             $pdo->commit();
 
-            $photoPath = (string)($old['check_in_photo_path'] ?? '');
-            $photoRoot = realpath(__DIR__ . '/../');
-            $photoFile = $photoRoot !== false ? realpath($photoRoot . '/' . ltrim($photoPath, '/')) : false;
-            if ($photoFile !== false && is_file($photoFile) && strpos($photoFile, $photoRoot . DIRECTORY_SEPARATOR) === 0) {
-                @unlink($photoFile);
-            }
+            deleteAttendancePhotoFile((string)($old['check_in_photo_path'] ?? ''));
 
             $_SESSION['attendance_success'] = 'Attendance record deleted successfully.';
             redirectAttendance();
