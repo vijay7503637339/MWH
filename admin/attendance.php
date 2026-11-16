@@ -25,7 +25,7 @@ function e(?string $value): string
 function deleteAttendancePhotoFile(?string $storedPath): void
 {
     $storedPath = trim((string)$storedPath);
-    if ($storedPath === '' || str_contains($storedPath, '..') || str_contains($storedPath, '\\\\')) {
+    if ($storedPath === '' || str_contains($storedPath, '..') || str_contains($storedPath, '\\')) {
         return;
     }
 
